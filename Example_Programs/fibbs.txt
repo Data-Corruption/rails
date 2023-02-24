@@ -1,0 +1,9 @@
+      IMM r1 1        # store 1 in reg 1.
+      IMM r3 1        # store 1 in reg 3.
+      IN  r15 r0      # get n from io reg 0.
+frog: ADD r2 r1 r2    # start of loop, add regs 1 and 2, store result in reg 2.
+      ADD r1 r1 r2    # add regs 1 and 2, store result in reg 1.
+      ADD r4 r3 r4    # increment loop counter, add regs 3 and 4, store in 4.
+      BEQ done: r4    # branch to line with tag "done" if reg 15 and reg 4 are equal.
+      JMP frog:       # jump to line with tag "frog".
+done: EXIT

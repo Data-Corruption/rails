@@ -1,0 +1,75 @@
+[source,blue]
+----
+    ___       ___       ___       ___       ___
+   /\  \     /\  \     /\  \     /\__\     /\  \
+  /::\  \   /::\  \   _\:\  \   /:/  /    /::\  \
+ /::\:\__\ /::\:\__\ /\/::\__\ /:/__/    /\:\:\__\
+ \;:::/  / \/\::/  / \::/\/__/ \:\  \    \:\:\/__/
+  |:\/__/    /:/  /   \:\__\    \:\__\    \::/  /
+   \|__|     \/__/     \/__/     \/__/     \/__/
+----
+
+// == Running assembly
+// example programs
+// === Emulator
+// === Redstone
+
+== Rails Instruction Set Architecture
+I designed this isa for minimal implementation complexity while still being practically capable of general computation. There are 16 instructions plus 3 pseudo instructions. Each instruction is 16 bits and there are 2 encoding formats. The instruction set was heavily inspired by https://user.eng.umd.edu/~blj/RiSC/[RISC 16], developed by Peter Chen at the University of Michigan.
+
+=== Instruction Encoding
+|====
+|*Type* 4+^|*Format*
+|3 Operand |Op Code 4 bit |A operand 4 bit |B operand 4 bit |C operand 4 bit 
+|Immediate |Op Code 4 bit 2+^|Immediate 8 bit |C operand 4 bit
+|====
+
+=== Instruction Descriptions
+.syntax legend
+[cols="~,90"]
+|====
+|*X |This is a pointer, meaning you are using the contents of the register as an address. That could be either an address for ram or the program counter. For example if 23 is in register 2 and you jump to register 2, the pc will be set to 23. If you LD from register 2 then ram address 23 will be stored in C.
+|rX |This is an abbreviation for “register”, so r15 is just short for “register 15”.
+|====
+.Instructions
+[cols="~,~,~,~"]
+|====
+|*Name* |*OP Code* |*Encoding Type* |*Description*
+|ADD |0000|3 Operand|A + B = C
+|ADDC|0001|3 Operand|A + B + (previous operation carry out) = C
+|SUB |0010|3 Operand|A - B = C
+|SWB |0011|3 Operand|A - B - (previous operation carry out) = C
+|NAND|0100|3 Operand|A NAND B = C
+|RSFT|0101|3 Operand|Logical right shift A, stores in C.
+|IMM|0110|Immediate|Stores Immediate in C.
+|LD  |0111|3 Operand|Loads data from ram address *A and stores at C.
+|LDIM|1000|Immediate|Loads data from ram address IMM and stores at C.
+|ST  |1001|3 Operand|Stores B in ram address *A.
+|STIM|1010|Immediate|Stores C in ram address IMM.
+|BEQ |1011|Immediate|Branch to IMM if r15 and C are equal.
+|BGT |1100|Immediate|Branch to IMM if r15 is greater than C.
+|JMPL|1101|3 Operand|Jumps to *A and stores the current instruction address + 1 in C.
+|IN  |1110|3 Operand|Loads data from i/o port A and stores at C.
+|OUT |1111|3 Operand|Stores B in i/o port A.
+|====
+.Pseudo Instructions
+[cols="~,80"]
+|====
+|NOP       |This operation does nothing and is replaced by ADD r0, r0, r0
+|MOV rX rY |This copies data from one register to another. It is replaced by ADD rX, r0, rY
+|JMP x     |This jumps to x. It is replaced by BEQ x r15
+|EXIT     a|This stops the program's execution and resets the program counter. It is replaced +
+by JMPL r0, r0. This should put the cpu in a state where it's ready to be started again.
+|====
+
+=== Memory
+[cols="~,80"]
+|====
+|Register File a|The register file is 16 bytes of dual read registers.
+
+* Register 0 is a constant 0. Writing to address 0 results in nothing being saved. Reading from it will always be 0.
+* Register 15 will always be used in branch instructions with C
+|Input/Output Ports |My implementation has 8 ports you can read / write to. Since the address is a 4 bit value if you made your own cpu using this isa you could go up to 16 ports. On mine any address above 0-7 it just ignores.
+|Data Storage |Data storage is 256 bytes of RAM.
+|Instruction Storage |Instructions are stored in 512 bytes of ROM, since instructions are 16 bit that means you have a max of 256 instructions.
+|====
