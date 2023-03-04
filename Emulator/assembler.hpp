@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <stdexcept>
 
 #include "typedefs.hpp"
 #include "string_addons.hpp"
@@ -120,9 +121,10 @@ public:
 				}
 			}
 
+			// if the program line is empty, it means that the instruction was not found and parsing failed
 			if (program.back().size() == 0)
 				throw std::invalid_argument("ERROR Line number: " + std::to_string(line_number) + " something went wrong here.");
-
+				
 		}
 
 	}
