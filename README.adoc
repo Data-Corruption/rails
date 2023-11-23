@@ -89,7 +89,7 @@ wip
 
 == Building From Source [[Section4]]
 
-The library https://github.com/AllenDang/giu[giu] depends on OpenGL 3.3, make sure your environment supports it (as far as I know, some Virtual Machines like VirtualBox doesn't support it).
+The library https://github.com/AllenDang/giu[giu] depends on OpenGL 3.3, make sure your environment supports it.
 
 === Windows
 
