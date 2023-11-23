@@ -1,3 +1,5 @@
+// simple fibbs program
+
       IMM r1 1        # store 1 in reg 1.
       IMM r3 1        # store 1 in reg 3.
       IN  r15 r0      # get n from io reg 0.

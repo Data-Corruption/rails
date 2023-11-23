@@ -1,4 +1,4 @@
-[source,blue]
+[source]
 ----
     ___       ___       ___       ___       ___
    /\  \     /\  \     /\  \     /\__\     /\  \
@@ -8,68 +8,116 @@
   |:\/__/    /:/  /   \:\__\    \:\__\    \::/  /
    \|__|     \/__/     \/__/     \/__/     \/__/
 ----
+Rails is an https://en.wikipedia.org/wiki/Instruction_set_architecture[ISA]
+ I designed for minimal implementation complexity while still being practically
+ capable of general computation and being 3 operand. There are 16 instructions
+ plus 3 pseudo instructions. Each instruction is 16 bits and there are 2 
+encoding formats. The instruction set was heavily inspired by 
+https://user.eng.umd.edu/~blj/RiSC/[RiSC 16], developed and used by Bruce Jacob 
+at University of Maryland. RiSC 16 itself is a derivative of the Little Computer 
+(LC-896) developed by Peter Chen at the University of Michigan.
 
-// == Running assembly
-// example programs
-// === Emulator
-// === Redstone
+<<Section1,Getting Started>> | <<Section2,ISA>> | <<Section3,Redstone Build>> | <<Section4,Building From Source>>
 
-== Rails Instruction Set Architecture
-I designed this isa for minimal implementation complexity while still being practically capable of general computation. There are 16 instructions plus 3 pseudo instructions. Each instruction is 16 bits and there are 2 encoding formats. The instruction set was heavily inspired by https://user.eng.umd.edu/~blj/RiSC/[RISC 16], developed by Peter Chen at the University of Michigan.
+== Getting Started [[Section1]]
 
-=== Instruction Encoding
+1. Download Emulator - Get the latest https://github.com/Data-Corruption/Rails/releases/latest[release] from this repo and unzip it.
+2. Write a program - Create a .rails file. You can look at https://github.com/Data-Corruption/Rails/tree/main/assembly_examples[examples], and see the ISA below for a full list of all available instructions.
+3. Emulate the program - Start the emulator and click 'open' then under 'program', select your .rails file and you're all set!
+4. Bring it into Minecraft - wip
+
+== ISA [[Section2]]
+
+.Instruction Binary Encoding
 |====
 |*Type* 4+^|*Format*
 |3 Operand |Op Code 4 bit |A operand 4 bit |B operand 4 bit |C operand 4 bit 
 |Immediate |Op Code 4 bit 2+^|Immediate 8 bit |C operand 4 bit
 |====
-
-=== Instruction Descriptions
-.syntax legend
+.Syntax Legend
 [cols="~,90"]
 |====
-|*X |This is a pointer, meaning you are using the contents of the register as an address. That could be either an address for ram or the program counter. For example if 23 is in register 2 and you jump to register 2, the pc will be set to 23. If you LD from register 2 then ram address 23 will be stored in C.
 |rX |This is an abbreviation for “register”, so r15 is just short for “register 15”.
+|RAM[rX] |This means you are using the contents of rX as an address for indexing RAM.
+|(last c-out) |The previous operation carry out.
 |====
 .Instructions
-[cols="~,~,~,~"]
+[cols="~,~,~,~,~"]
 |====
-|*Name* |*OP Code* |*Encoding Type* |*Description*
-|ADD |0000|3 Operand|A + B = C
-|ADDC|0001|3 Operand|A + B + (previous operation carry out) = C
-|SUB |0010|3 Operand|A - B = C
-|SWB |0011|3 Operand|A - B - (previous operation carry out) = C
-|NAND|0100|3 Operand|A NAND B = C
-|RSFT|0101|3 Operand|Logical right shift A, stores in C.
-|IMM|0110|Immediate|Stores Immediate in C.
-|LD  |0111|3 Operand|Loads data from ram address *A and stores at C.
-|LDIM|1000|Immediate|Loads data from ram address IMM and stores at C.
-|ST  |1001|3 Operand|Stores B in ram address *A.
-|STIM|1010|Immediate|Stores C in ram address IMM.
-|BEQ |1011|Immediate|Branch to IMM if r15 and C are equal.
-|BGT |1100|Immediate|Branch to IMM if r15 is greater than C.
-|JMPL|1101|3 Operand|Jumps to *A and stores the current instruction address + 1 in C.
-|IN  |1110|3 Operand|Loads data from i/o port A and stores at C.
-|OUT |1111|3 Operand|Stores B in i/o port A.
+|*Name* |*Opcode* |*Bin Encoding* |*Assembly* |*Description*
+|ADD |0000|3 Operand|ADD rC rA rB |C = A + B
+|ADDC|0001|3 Operand|ADDC rC rA rB|C = A + B + (last c-out)
+|SUB |0010|3 Operand|SUB rC rA rB |C = A - B
+|SWB |0011|3 Operand|SWB rC rA rB |C = A - B - (last c-out)
+|NAND|0100|3 Operand|NAND rC rA rB|C = A NAND B
+|RSFT|0101|3 Operand|RSFT rC rA   |C = Logical right shift A
+|IMM |0110|Immediate|IMM rC IMM   |C = Immediate
+|LD  |0111|3 Operand|LD rC rA     |C = RAM[rA]
+|LDIM|1000|Immediate|LDIM rC IMM  |C = RAM[IMM]
+|ST  |1001|3 Operand|ST rA rB     |RAM[rA] = B
+|STIM|1010|Immediate|STIM IMM rC  |RAM[IMM] = C
+|BEQ |1011|Immediate|BEQ IMM rC   |PC = IMM if r15 equals C
+|BGT |1100|Immediate|BGT IMM rC   |PC = IMM if r15 > C
+|JMPL|1101|3 Operand|JMPL rC rA   |C = PC + 1, then PC = A
+|IN  |1110|3 Operand|IN rC rA     |C = i/o port A
+|OUT |1111|3 Operand|OUT rA rB    |i/o port A = B
 |====
 .Pseudo Instructions
 [cols="~,80"]
 |====
-|NOP       |This operation does nothing and is replaced by ADD r0, r0, r0
-|MOV rX rY |This copies data from one register to another. It is replaced by ADD rX, r0, rY
-|JMP x     |This jumps to x. It is replaced by BEQ x r15
-|EXIT     a|This stops the program's execution and resets the program counter. It is replaced +
-by JMPL r0, r0. This should put the cpu in a state where it's ready to be started again.
+|*Assembly* |*Description*
+|NOP      |This operation does nothing and is replaced by ADD r0, r0, r0
+|MOV rX rY|This copies data from rX to rY. It is replaced by ADD rX, r0, rY
+|JMP IMM  |This jumps to IMM. It is replaced by BEQ IMM r15. The IMM like the rest, can be a line tag.
+|EXIT     |This stops the cpu and resets the program counter. It is replaced + by JMPL r0, r0.
 |====
-
-=== Memory
+.Memory
 [cols="~,80"]
 |====
 |Register File a|The register file is 16 bytes of dual read registers.
 
 * Register 0 is a constant 0. Writing to address 0 results in nothing being saved. Reading from it will always be 0.
 * Register 15 will always be used in branch instructions with C
-|Input/Output Ports |My implementation has 8 ports you can read / write to. Since the address is a 4 bit value if you made your own cpu using this isa you could go up to 16 ports. On mine any address above 0-7 it just ignores.
+|Input/Output Ports |16 ports you can read / write to. The ports do not feed back into themselves, Each port actually has two registers, one for the in and one for the out.
 |Data Storage |Data storage is 256 bytes of RAM.
-|Instruction Storage |Instructions are stored in 512 bytes of ROM, since instructions are 16 bit that means you have a max of 256 instructions.
+|Instruction Storage |Since the Program Counter is 8 bit (256 addresses) and instructions are 16 bit (2 bytes each), this means the instruction memory will be 512 bytes of ROM.
 |====
+
+== Redstone Build [[Section3]]
+
+wip
+
+== Building From Source [[Section4]]
+
+The library https://github.com/AllenDang/giu[giu] depends on OpenGL 3.3, make sure your environment supports it (as far as I know, some Virtual Machines like VirtualBox doesn't support it).
+
+=== Windows
+
+Install https://jmeubank.github.io/tdm-gcc/[TDM-GCC]
+
+or
+
+* Install https://github.com/brechtsanders/winlibs_mingw/releases/latest[mingw]
+* Add the binaries folder of mingw to the path (usually is \mingw64\bin).
+* go get github.com/AllenDang/giu
+
+Then you should be able to build by running build.bat from the root folder of the project.
+
+=== Linux
+
+Install the required dependencies:
+[source,shell]
+----
+sudo apt install libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libglx-dev libgl1-mesa-dev libxxf86vm-dev libgtk-3-dev
+----
+on Red Hat based distributions:
+[source,shell]
+----
+sudo dnf install libX11-devel libXcursor-devel libXrandr-devel libXinerama-devel libXi-devel libGL-devel libXxf86vm-devel gtk3-devel
+----
+
+you may also need to install C/C++ compiler (like g++) if it isn't already installed. Follow go compiler prompts.
+
+Then you should be able to build by running build.bat from the root folder of the project.
+
+Cross-compiling is a bit more complicated, see the https://pkg.go.dev/github.com/AllenDang/giu#readme-install[giu docs]

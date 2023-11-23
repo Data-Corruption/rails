@@ -1,10 +1,4 @@
 
-Rewrite/
-
-Rewrite Schem Builder/
-
-.vscode/
-
-Emulator/build/
+dist/
 
 notes.txt
