@@ -21,9 +21,9 @@ at University of Maryland. RiSC 16 itself is a derivative of the Little Computer
 
 == Getting Started [[Section1]]
 
-1. Download Emulator - Get the latest https://github.com/Data-Corruption/Rails/releases/latest[release] from this repo and unzip it.
-2. Write a program - Create a .rails file. You can look at https://github.com/Data-Corruption/Rails/tree/main/assembly_examples[examples], and see the ISA below for a full list of all available instructions.
-3. Emulate the program - Start the emulator and click 'open' then under 'program', select your .rails file and you're all set!
+1. Download The Emulator - Get the latest https://github.com/Data-Corruption/Rails/releases/latest[release] from this repo and unzip it.
+2. Create a Program - Write a .rails file using instructions from the ISA. See https://github.com/Data-Corruption/Rails/tree/main/assembly_examples[examples] for guidance.
+3. Run the Program - Launch the emulator, open your program, and you're ready to go!
 4. Bring it into Minecraft - wip
 
 == ISA [[Section2]]
