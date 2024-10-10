@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"strconv"
+	"strings"
 )
 
-// ---- types ----
+// ---- types -----------------------------------------------------------------
 
 type encodingType int
+
 const (
 	AB encodingType = iota
 	CA
@@ -18,12 +19,13 @@ const (
 )
 
 type instruction struct {
-	opcode uint8;
-	encoding encodingType;
+	opcode   uint8
+	encoding encodingType
 }
 
-// ---- variables ----
+// ---- variables -------------------------------------------------------------
 
+// instructions maps assembly instructions to their opcode and encoding type.
 var instructions = map[string]instruction{
 	"ADD":  {0, CAB},
 	"ADDC": {1, CAB},
@@ -43,206 +45,203 @@ var instructions = map[string]instruction{
 	"OUT":  {15, AB},
 }
 
-var line_tag_map = map[string]uint16{}
+// ---- Private functions -----------------------------------------------------
 
-// ---- functions ----
-
-func isLineCommentOrEmpty(line string) bool {
-	if len(line) < 2 { return true }
-	if line[0] == '#' || (line[0] == '/' && line[1] == '/') { return true }
-	return false
-}
-
-// parses a register, removes the 'r' from the front of the string if present and returns the number
-func parseReg(input string, src_line_number uint16) (uint8, error) {
-	// make sure string isn't empty
-	if len(input) == 0 { 
-		return 0, fmt.Errorf("Line %d: Error parsing register", src_line_number)
-	}
-
-	// remove 'r' from the front of the string if present
-	if input[0] == 'r' { input = input[1:] }
-
-	// parse register
-	reg, err := strconv.ParseUint(input, 10, 8)
-	if err != nil {
-		return 0, fmt.Errorf("Line %d: Failed to parse register: %s", src_line_number, input)
-	}
-	// make sure it's in range
-	if reg > 15 {
-		return 0, fmt.Errorf("Line %d: Register out of range: %s", src_line_number, input)
-	}
-	return uint8(reg), nil
-}
-
-// parses an immediate value, if the immediate is a tag, it will return the line number of the tag
-func parseImm(input string, src_line_number uint16) (uint8, error) {
-	// make sure string isn't empty
-	if len(input) == 0 {
-		return 0, fmt.Errorf("Line %d: Error parsing immediate", src_line_number)
-	}
-
-	// if the last character is a colon, it's a tag
-	if input[len(input)-1] == ':' {
-		// get line number from tag
-		line_number, ok := line_tag_map[input]
-		if !ok { return 0, fmt.Errorf("Line %d: Unknown line tag: %s", src_line_number, input) }
-		return uint8(line_number), nil
-	} else {
-		// parse immediate
-		imm, err := strconv.ParseUint(input, 10, 8)
-		if err != nil { return 0, fmt.Errorf("Line %d: Failed to parse immediate: %s", src_line_number, input) }
-		return uint8(imm), nil
-	}
-}
-
-// converts pseudo instructions to real instructions if present, otherwise returns the original tokens
-func convertPseudoIfPresent(tokens []string) []string {
+// convertPseudoInstruction converts pseudo instructions to real instructions.
+func convertPseudoInstruction(tokens []string) {
 	switch tokens[0] {
-		case "NOP": return []string{"ADD", "r0", "r0", "r0"}
-		case "MOV": return []string{"ADD", tokens[1], "r0", tokens[2]}
-		case "JMP": return []string{"BEQ", tokens[1], "r15"}
-		case "EXIT": return []string{"JMPL", "r0", "r0"}
-		default: return tokens
+	case "NOP":
+		tokens = []string{"ADD", "r0", "r0", "r0"}
+	case "MOV":
+		tokens = []string{"ADD", tokens[1], "r0", tokens[2]}
+	case "JMP":
+		tokens = []string{"BEQ", tokens[1], "r15"}
+	case "EXIT":
+		tokens = []string{"JMPL", "r0", "r0"}
+	default:
+		return
 	}
 }
 
-// encodes an instruction, result = [opcode 4bit | a 4bit | b 4bit | c 4bit]
-func encode(opcode uint16, a uint16, b uint16, c uint16) uint16 {
-	return (opcode << 12) | (a << 8) | (b << 4) | c
-}
-// encodes an imm instruction, result = [opcode 4bit | imm 8bit | c 4bit]
-func encodeImm(opcode uint16, imm uint16, c uint16) uint16 {
-	return (opcode << 12) | (imm << 4) | c
-}
-
-// parses an instruction, returns the binary representation of the instruction. sln is short for source line number
-func parseInstruction(line string, sln uint16) (uint16, error) {
+// parseInstruction returns the binary encoded equivalent of an assembly instruction.
+func parseInstruction(line string, tagMap map[string]uint16) (uint16, error) {
 	// split line into tokens
-	raw_tokens := strings.Fields(line)
-	if len(raw_tokens) < 1 { return 0, fmt.Errorf("Line %d: Error parsing instruction", sln) }
-
-	// trim whitespace from tokens
-	for i := 0; i < len(raw_tokens); i++ {
-		raw_tokens[i] = strings.TrimSpace(raw_tokens[i])
+	tokens := strings.Fields(line)
+	if len(tokens) < 1 {
+		return 0, fmt.Errorf("Error parsing instruction")
 	}
 
 	// if first token is a tag, remove it
-	if raw_tokens[0][len(raw_tokens[0])-1] == ':' {
-		raw_tokens = raw_tokens[1:]
+	if tokens[0][len(tokens[0])-1] == ':' {
+		tokens = tokens[1:]
 	}
 
-	// convert pseudo instructions to real instructions if present
-	tokens := convertPseudoIfPresent(raw_tokens)
+	// if it's a pseudo instruction, convert it to a real instruction
+	convertPseudoInstruction(tokens)
 
 	// get instruction
-	inst, ok := instructions[tokens[0]]
-	if !ok { return 0, fmt.Errorf("Line %d: Unknown instruction: %s", sln, tokens[0]) }
+	instruction, ok := instructions[tokens[0]]
+	if !ok {
+		return 0, fmt.Errorf("Unknown instruction: %s", tokens[0])
+	}
 
 	// check for invalid number of arguments
 	minArgCount := 3
-	if inst.encoding == CAB { minArgCount = 4 }
+	if instruction.encoding == CAB {
+		minArgCount = 4
+	}
 	if len(tokens) < minArgCount {
-		return 0, fmt.Errorf("Line %d: Not enough args, expected %d, got: %d", sln, minArgCount-1, len(tokens)-1)
+		return 0, fmt.Errorf("Not enough args, expected %d, got: %d", minArgCount-1, len(tokens)-1)
+	}
+
+	// parses a register, removes the 'r' from the front of the string if present and returns the number
+	parseReg := func(out *uint8, input string) func() error {
+		return func() error {
+
+			// make sure string isn't empty
+			if len(input) == 0 {
+				return fmt.Errorf("Error parsing register")
+			}
+
+			// remove 'r' from the front of the string if present
+			if input[0] == 'r' {
+				input = input[1:]
+			}
+
+			// parse number
+			reg, err := strconv.ParseUint(input, 10, 8)
+			if err != nil {
+				return fmt.Errorf("Failed to parse register: %s", input)
+			}
+
+			// make sure it's in range
+			if reg > 15 {
+				return fmt.Errorf("Register out of range: %s", input)
+			}
+
+			*out = uint8(reg)
+			return nil
+		}
+	}
+
+	// parses an immediate value, if the immediate is a tag, it will return the line number of the tag
+	parseImm := func(out *uint8, input string) func() error {
+		return func() error {
+
+			// make sure string isn't empty
+			if len(input) == 0 {
+				return fmt.Errorf("Error parsing immediate")
+			}
+
+			// if the last character is a colon, it's a tag
+			if input[len(input)-1] == ':' {
+				// get line number using tag
+				if line_number, ok := tagMap[input]; ok {
+					*out = uint8(line_number)
+					return nil
+				}
+				return fmt.Errorf("Unknown line tag: %s", input)
+			} else {
+				// not a tag, parse number
+				if imm, err := strconv.ParseUint(input, 10, 8); err == nil {
+					*out = uint8(imm)
+					return nil
+				}
+				return fmt.Errorf("Failed to parse immediate: %s", input)
+			}
+		}
 	}
 
 	// parse instruction
 	var a, b, c, imm uint8
-	var err error
 	parse := func() error {
-    switch inst.encoding {
-    case AB:
-      if a, err = parseReg(tokens[1], sln); err != nil { return err }
-      if b, err = parseReg(tokens[2], sln); err != nil { return err }
-			break
+		switch instruction.encoding {
+		case AB:
+			return Try(parseReg(&a, tokens[1]), parseReg(&b, tokens[2]))
 		case CA:
-			if c, err = parseReg(tokens[1], sln); err != nil { return err }
-			if a, err = parseReg(tokens[2], sln); err != nil { return err }
-			break
+			return Try(parseReg(&c, tokens[1]), parseReg(&a, tokens[2]))
 		case CAB:
-			if c, err = parseReg(tokens[1], sln); err != nil { return err }
-			if a, err = parseReg(tokens[2], sln); err != nil { return err }
-			if b, err = parseReg(tokens[3], sln); err != nil { return err }
-			break
+			return Try(parseReg(&c, tokens[1]), parseReg(&a, tokens[2]), parseReg(&b, tokens[3]))
 		case C_IMM:
-			if c, err = parseReg(tokens[1], sln); err != nil { return err }
-			if imm, err = parseImm(tokens[2], sln); err != nil { return err }
-			break
+			return Try(parseReg(&c, tokens[1]), parseImm(&imm, tokens[2]))
 		case IMM_C:
-			if imm, err = parseImm(tokens[1], sln); err != nil { return err }
-			if c, err = parseReg(tokens[2], sln); err != nil { return err }
-			break
+			return Try(parseImm(&imm, tokens[1]), parseReg(&c, tokens[2]))
 		default:
-			return fmt.Errorf("Line %d: Unknown encoding type: %d", sln, inst.encoding)
+			return fmt.Errorf("Unknown encoding type: %d", instruction.encoding)
 		}
-		return nil
 	}
 	if err := parse(); err != nil {
-		return 0, fmt.Errorf("Line %d:\nRaw: \"%s\"\n%d Tokens: %s\nError: %s", sln, line, len(tokens), tokens, err.Error())
+		return 0, err
 	}
 
 	// encode instruction
-	if inst.encoding == C_IMM || inst.encoding == IMM_C {
-		return encodeImm(uint16(inst.opcode), uint16(imm), uint16(c)), nil
+	if instruction.encoding == C_IMM || instruction.encoding == IMM_C {
+		// [opcode 4bit | imm 8bit | c 4bit]
+		return ((uint16(instruction.opcode) << 12) | (uint16(imm) << 4) | uint16(c)), nil
 	} else {
-		return encode(uint16(inst.opcode), uint16(a), uint16(b), uint16(c)), nil
+		// [opcode 4bit | a 4bit | b 4bit | c 4bit]
+		return ((uint16(instruction.opcode) << 12) | (uint16(a) << 8) | (uint16(b) << 4) | uint16(c)), nil
 	}
 }
 
-// Returns string if error, nil if successful
-func AssembleFile(path string, prom []uint16) (uint8, error) {
-	// clear line tag map
-	line_tag_map = map[string]uint16{}
-	var line_number uint16 = 0
-
-	// read file
-	raw_file, err := ReadStringFromFile(path)
-	if err != nil { return 0, err }
-	if len(raw_file) == 0 { return 0, fmt.Errorf("File is empty") }
+// Assemble converts a string of assembly code to a program ROM.
+// Returns the number of instructions assembled and an error if one occurred.
+func Assemble(assembly string, programROM []uint16) (uint, error) {
+	var tagMap = map[string]uint16{}
+	var lineNumber = (uint16)(0) // actual line number (excludes empty lines and comments)
 
 	// first pass: build line tag map
-	ForEachLine(raw_file, func(line string) error {
+	if err := ForEachLine(assembly, func(index int, line string) error {
 		line = strings.TrimSpace(line)
-		if isLineCommentOrEmpty(line) { return nil }
-		// get up to the first space
-		first_token := strings.Split(line, " ")[0]
-		// if ends with a colon, it's a tag, add it to the map
-		if first_token[len(first_token)-1] == ':' {
-			line_tag_map[first_token] = line_number
+		// skip lines that are empty or start with a comment
+		if len(line) == 0 || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "#") {
+			return nil
 		}
-		line_number++
+		// get first token
+		tokens := strings.Fields(line)
+		if len(tokens) == 0 || len(tokens[0]) == 0 {
+			return nil
+		}
+		// if ends with a colon, it's a tag, add it to the map
+		if tokens[0][len(tokens[0])-1] == ':' {
+			tagMap[tokens[0]] = lineNumber
+		}
+		lineNumber++
 		return nil
-	})
+	}); err != nil {
+		return 0, err
+	}
 
 	// second pass: assemble
-	line_number = 0
-	var src_line_number uint16 = 0
-	err = ForEachLine(raw_file, func(line string) error {
-		// check if program is too long
-		if line_number > 255 { return fmt.Errorf("Program is too long. Max length is 256 instructions") }
-
-		// trim whitespace, skip empty lines and comments
+	lineNumber = 0 // reset line number for second pass
+	if err := ForEachLine(assembly, func(index int, line string) error {
+		// check if program is too long, trim whitespace, skip empty lines and comments
+		if lineNumber > 255 {
+			return fmt.Errorf("Program is too long. Max length is 256 instructions")
+		}
 		line = strings.TrimSpace(line)
-		if isLineCommentOrEmpty(line) {
-			src_line_number++
+		if len(line) == 0 || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "#") {
 			return nil
 		}
 
 		// parse instruction
-		encoded_instr, err := parseInstruction(line, src_line_number)
-		if err != nil { return err }
+		encodedInstruction, err := parseInstruction(line, tagMap)
+		if err != nil {
+			return fmt.Errorf("Line %d: %s", index, err.Error())
+		}
 
-		// write instruction to prom and increment line numbers
-		prom[line_number] = encoded_instr
-		src_line_number++
-		line_number++
+		// write encoded instruction to program ROM and increment line number
+		programROM[lineNumber] = encodedInstruction
+		lineNumber++
 		return nil
-	})
-
-	// clear remaining prom
-	for i := line_number; i < 256; i++ {
-		prom[i] = 0
+	}); err != nil {
+		return 0, err
 	}
 
-	return uint8(line_number), err
+	// clear remaining program ROM
+	for i := lineNumber; i < 256; i++ {
+		programROM[i] = 0
+	}
+
+	return uint(lineNumber), nil
 }
