@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"bufio"
@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 )
+
+var Version string
 
 type LineCallback func(index int, line string) error
 
@@ -34,6 +36,18 @@ func Contains[T comparable](element T, slice []T) bool {
 	return false
 }
 
+// ContainsAny checks if a slice contains any of the elements in another slice.
+func ContainsAny[T comparable](elements []T, slice []T) bool {
+	for _, element := range elements {
+		for _, sliceElement := range slice {
+			if element == sliceElement {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Behold... my unholy attack on god himself.
 func Ternary[T any](condition bool, a, b T) T {
 	if condition {
@@ -42,7 +56,7 @@ func Ternary[T any](condition bool, a, b T) T {
 	return b
 }
 
-// Demons possessed me then wrote this against my will. Forgive me.
+// Demons possessed me, then using my mortal form, they wrote this abomination.
 func Try(funcs ...func() error) error {
 	for _, fn := range funcs {
 		if err := fn(); err != nil {
