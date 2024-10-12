@@ -3,7 +3,9 @@ module.exports = {
   content: ["./internal/public/**/*.{html,js}"],
   theme: {
     extend: {
-      fontFamily: {},
+      fontFamily: {
+        ProggyVector: ["ProggyVector"],
+      },
     },
   },
   plugins: [require("@tailwindcss/typography"),require('daisyui')],

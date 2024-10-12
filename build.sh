@@ -3,6 +3,7 @@
 MOD_NAME="rails"
 VERSION_VAR_PATH="$MOD_NAME/internal/utils.Version"
 
+CURRENT_DIR=$(pwd)
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENTRY_POINT="$PROJECT_ROOT/cmd/$MOD_NAME"
 DIST_DIR="$PROJECT_ROOT/dist"
@@ -40,10 +41,15 @@ build() {
 TAIL_INPUT="./internal/input.css"
 TAIL_OUTPUT="./internal/public/css/output.css"
 TAIL_CONFIG_PATH="./internal/tailwind.config.js"
+cd "$PROJECT_ROOT"
 npx tailwindcss --config "$TAIL_CONFIG_PATH" -i "$TAIL_INPUT" -o "$TAIL_OUTPUT" --minify
+cd "$CURRENT_DIR"
 
 # If -dev flag is set, build the binary for the current platform and capture the output path without printing.
 if [ "$1" == "-dev" ]; then
+  # Copy the public directory to the bin directory
+  mkdir -p "$BIN_DIR/public" && cp -r "$PROJECT_ROOT/internal/public" "$BIN_DIR"
+  # Build the binary and capture the output path
   BIN_PATH=$(build "$(go env GOOS)" "$(go env GOARCH)" > /dev/null)
   echo "Successfully built $MOD_NAME for $(go env GOOS) $(go env GOARCH)."
   exit 0
@@ -59,10 +65,10 @@ for PLATFORM in linux windows darwin; do
     ZIP_PATH="$DIST_DIR/$MOD_NAME-$VERSION-$PLATFORM-$ARCH.zip"
     
     # Zip the files
-    zip -j "$ZIP_PATH" "./LICENSE.md" "./README.adoc" "$BIN_PATH"
+    zip -j "$ZIP_PATH" "$PROJECT_ROOT/LICENSE.md" "$PROJECT_ROOT/README.adoc" "$BIN_PATH"
     cd "$PROJECT_ROOT/internal"
     zip -r "$ZIP_PATH" "./public"
-    cd "$PROJECT_ROOT"
+    cd "$CURRENT_DIR"
     
     echo "Zipped $MOD_NAME for $PLATFORM $ARCH."
   done

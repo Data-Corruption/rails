@@ -2,8 +2,6 @@ package utils
 
 import (
 	"bufio"
-	r "reflect"
-	"strconv"
 	"strings"
 )
 
@@ -64,22 +62,4 @@ func Try(funcs ...func() error) error {
 		}
 	}
 	return nil
-}
-
-// NumberToString converts a number to a string with a given width and padding character. e.g. (5, 3, "0", 10) -> "005", (5, 3, "0", 2) -> "101"
-func NumberToString(number interface{}, width uint16, paddingChar string, base int) string {
-	var s string
-	v := r.ValueOf(number)
-	switch v.Kind() {
-	case r.Int, r.Int8, r.Int16, r.Int32, r.Int64:
-		s = strconv.FormatInt(v.Int(), base)
-	case r.Uint, r.Uint8, r.Uint16, r.Uint32, r.Uint64:
-		s = strconv.FormatUint(v.Uint(), base)
-	default:
-		return "invalid type"
-	}
-	for len(s) < int(width) {
-		s = paddingChar + s
-	}
-	return s
 }

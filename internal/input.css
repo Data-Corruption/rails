@@ -2,4 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {}
+@layer base {
+  @font-face {
+    font-family: 'ProggyVector';
+    font-style: normal;
+    font-weight: 400;
+    src: url('/public/ProggyVector.ttf') format('truetype');
+  }
+}

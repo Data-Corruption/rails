@@ -111,6 +111,7 @@ class RailsEmulator extends Emulator {
     this.OutRegisters = new Uint8Array(16);
     this.ProgramCounter = 0;
     this.CarryFlag = false;
+    this.Breakpoints = [];
   }
 
   Step() {
@@ -118,6 +119,15 @@ class RailsEmulator extends Emulator {
     // if 1101 0000 0000 0000 (exit instruction) is encountered, stop the emulator
     if (instruction === 0xd000) {
       return false;
+    }
+
+    // check for breakpoints
+    if (this.isRunning) {
+      if (this.Breakpoints.includes(this.ProgramCounter)) {
+        this.isRunning = false;
+        console.log(`Breakpoint hit at ${this.ProgramCounter}`);
+        return false;
+      }
     }
 
     const BYTE_MASK = 0x00ff;
