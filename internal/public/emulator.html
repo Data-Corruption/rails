@@ -21,9 +21,9 @@
   </script>
 </head>
 
-<body>
+<body class="h-dvh flex flex-col">
   <!-- navbar -->
-  <div class="navbar bg-base-300 h-3.5">
+  <div class="navbar bg-base-300">
     <div class="navbar-start h-full">
       <a href="/" class="h-full flex flex-row space-x-2">
         <img id="logo" class="h-full" src="" alt="logo" />
@@ -35,8 +35,7 @@
             logo.src = theme === 'dark' ? '/public/logo-darkmode.png' : '/public/logo-lightmode.png'
           })
         </script>
-        <span
-          class="self-center font-semibold tracking-wide font-ProggyVector whitespace-nowrap">Rails</span>
+        <span class="self-center font-semibold tracking-wide font-ProggyVector whitespace-nowrap">Rails</span>
       </a>
     </div>
     <div class="navbar-end">
@@ -63,12 +62,44 @@
     </div>
   </div>
   <!-- main contents -->
-  
-  <!-- flex col that turns into row past xl-->
-  <div class="flex flex-col xl:flex-row space-y-4 xl:space-y-0 xl:space-x-4 p-4">
-    <div><p>test 1</p></div>
-    <div><p>test 2</p></div>
-    <div><p>test 3</p></div>
+  <div class="w-full flex-grow flex flex-col 2xl:flex-row space-y-4 2xl:space-y-0 2xl:space-x-4 p-4 items-center">
+    <div class="w-[600px] h-full bg-base-200 rounded p-4">
+      <p>Assembly</p>
+    </div>
+    <div class="w-[600px] h-full bg-base-200 rounded p-4">
+      <p>Controls / PC / Carry Flag</p>
+      <p>I/O registers</p>
+    </div>
+    <div class="w-[600px] h-full bg-base-200 rounded p-4 space-y-4">
+      <h3 class="font-bold text-lg">Register file</h3>
+      <div id="regfile" class="grid grid-cols-16 gap-1"></div>
+      <h3 class="font-bold text-lg">Memory</h3>
+      <div id="memory" class="grid grid-cols-16 gap-1"></div>
+      <script>
+        /*Example byte cell
+        <div class="tooltip w-8 h-8 bg-base-100 text-center flex items-center justify-center rounded" data-tip="0x00" data-address=0>
+          value
+        </div>
+        */
+       function genCell(address) {
+          const cell = document.createElement('div')
+          cell.classList.add('tooltip', 'w-8', 'h-8', 'bg-base-100', 'text-center', 'flex', 'items-center', 'justify-center', 'rounded')
+          cell.dataset.tip = `0x${address.toString(16).padStart(2, '0')}`
+          cell.dataset.address = address
+          cell.textContent = address
+          return cell
+        }
+        const regfile = document.getElementById('regfile')
+        for (let i = 0; i < 16; i++) {
+          regfile.appendChild(genCell(i))
+        }
+        const memory = document.getElementById('memory')
+        for (let i = 0; i < 256; i++) {
+          memory.appendChild(genCell(i))
+        }
+      </script>
+    </div>
+
   </div>
 
 </body>
