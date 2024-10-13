@@ -62,13 +62,73 @@
     </div>
   </div>
   <!-- main contents -->
-  <div class="w-full flex-grow flex flex-col 2xl:flex-row space-y-4 2xl:space-y-0 2xl:space-x-4 p-4 items-center">
-    <div class="w-[600px] h-full bg-base-200 rounded p-4">
-      <p>Assembly</p>
+  <div class="w-full flex-grow flex flex-col 2xl:flex-row space-y-4 2xl:space-y-0 2xl:space-x-4 p-4">
+    <div class="w-[600px] h-full bg-base-200 rounded p-4 flex flex-col space-y-4">
+      <h3 class="font-bold text-lg">Assembly</h3>
+      <div class="flex flex-row mb-2 space-x-2">
+        <button class="btn btn-sm btn-primary" onclick="loadAssembly()">Load</button>
+        <button class="btn btn-sm btn-primary" onclick="saveAssembly()">Save</button>
+        <button class="btn btn-sm btn-primary" onclick="flashAssembly()">Flash Program ROM</button>
+      </div>
+      <div id="editor" class="flex-grow"></div> <!-- height issue on vertical mode -->
+      <script src="/public/ace/ace.js" type="text/javascript" charset="utf-8"></script>
+      <script src="/public/ace/rails_assembly_highlight_rules.js" type="text/javascript" charset="utf-8"></script>
+      <script src="/public/ace/mode-rails_assembly.js" type="text/javascript" charset="utf-8"></script>
+      <script>
+        ace.config.set("basePath", "/public/ace");
+        var editor = ace.edit("editor");
+        editor.setTheme("ace/theme/twilight");
+        editor.session.setMode("ace/mode/rails_assembly");
+      </script>
     </div>
     <div class="w-[600px] h-full bg-base-200 rounded p-4">
-      <p>Controls / PC / Carry Flag</p>
-      <p>I/O registers</p>
+      <h3 class="font-bold text-lg">Controls</h3>
+      <div class="flex flex-row mb-2 space-x-2">
+        <button class="btn btn-sm btn-primary" onclick="start()">Start</button>
+        <button class="btn btn-sm btn-primary" onclick="stop()">Stop</button>
+        <button class="btn btn-sm btn-primary" onclick="step()">Step</button>
+        <button class="btn btn-sm btn-primary" onclick="reset()">Reset</button>
+      </div>
+      <!-- start, stop, step, reset, and pc / carry reg -->
+      <h3 class="font-bold text-lg">I/O registers</h3>
+      <div class="flex flex-row mb-2 space-x-2">
+        <div class="font-semibold text-center flex items-center justify-center">Address:</div>
+        <input id="io_in_address" type="number" max="255" min="0" placeholder="0"
+          class="input input-bordered max-h-8 max-w-16" />
+        <div class="font-semibold text-center flex items-center justify-center">Value:</div>
+        <input id="io_in_value" type="number" max="255" min="0" placeholder="0"
+          class="input input-bordered max-h-8 max-w-16" />
+        <button class="btn btn-sm btn-primary" onclick="setIoReg()">Set</button>
+      </div>
+      <div id="ioregs" class="grid grid-cols-16 gap-1"></div>
+      <script>
+        /* Example:
+        <div class="tooltip w-8 h-16 bg-base-100 flex flex-col rounded" data-tip="0x00" data-address=0>
+          <div class="inreg basis-1/2 text-center flex items-center justify-center">value</div>
+          <div class="outreg basis-1/2 text-center flex items-center justify-center">value</div>
+        </div>
+        */
+        function genIoCell(address) {
+          const cell = document.createElement('div')
+          cell.classList.add('tooltip', 'w-8', 'h-16', 'bg-base-100', 'flex', 'flex-col', 'rounded')
+          cell.dataset.tip = `0x${address.toString(16).padStart(2, '0')}`
+          cell.dataset.address = address
+          const inreg = document.createElement('div')
+          inreg.classList.add('inreg', 'basis-1/2', 'text-center', 'flex', 'items-center', 'justify-center')
+          inreg.textContent = '0'
+          const outreg = document.createElement('div')
+          outreg.classList.add('outreg', 'basis-1/2', 'text-center', 'flex', 'items-center', 'justify-center')
+          outreg.textContent = '0'
+          cell.appendChild(inreg)
+          cell.appendChild(outreg)
+          return cell
+        }
+
+        const ioregs = document.getElementById('ioregs')
+        for (let i = 0; i < 16; i++) {
+          ioregs.appendChild(genIoCell(i))
+        }
+      </script>
     </div>
     <div class="w-[600px] h-full bg-base-200 rounded p-4 space-y-4">
       <h3 class="font-bold text-lg">Register file</h3>
@@ -76,23 +136,26 @@
       <h3 class="font-bold text-lg">Memory</h3>
       <div id="memory" class="grid grid-cols-16 gap-1"></div>
       <script>
-        /*Example byte cell
-        <div class="tooltip w-8 h-8 bg-base-100 text-center flex items-center justify-center rounded" data-tip="0x00" data-address=0>
-          value
-        </div>
-        */
-       function genCell(address) {
+        // Example: <div class="tooltip w-8 h-8 bg-base-100 text-center flex items-center justify-center rounded" data-tip="0x00" data-address=0>value</div>
+        function genCell(address) {
           const cell = document.createElement('div')
           cell.classList.add('tooltip', 'w-8', 'h-8', 'bg-base-100', 'text-center', 'flex', 'items-center', 'justify-center', 'rounded')
           cell.dataset.tip = `0x${address.toString(16).padStart(2, '0')}`
           cell.dataset.address = address
-          cell.textContent = address
+          cell.textContent = '0'
           return cell
         }
+
+        // generate regfile
         const regfile = document.getElementById('regfile')
         for (let i = 0; i < 16; i++) {
           regfile.appendChild(genCell(i))
         }
+        // switch 0 reg bg to base-300 to indicate it's a constant 0
+        regfile.children[0].classList.remove('bg-base-100')
+        regfile.children[0].classList.add('bg-base-300')
+
+        // generate memory
         const memory = document.getElementById('memory')
         for (let i = 0; i < 256; i++) {
           memory.appendChild(genCell(i))

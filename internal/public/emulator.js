@@ -224,7 +224,7 @@ class RailsEmulator extends Emulator {
     await this.Stop();
     this.RegisterFile.fill(0);
     this.Ram.fill(0);
-    this.InRegisters.fill(0);
+    // don't reset input registers.
     this.OutRegisters.fill(0);
     this.ProgramCounter = 0;
     this.CarryFlag = false;
