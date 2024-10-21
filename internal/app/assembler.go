@@ -53,13 +53,13 @@ var instructions = map[string]instruction{
 // Returns the number of instructions assembled and an error if one occurred.
 func Assemble(assembly string, programROM []uint16) (uint, error) {
 	var tagMap = map[string]uint16{}
-	var lineNumber = (uint16)(0) // actual line number (excludes empty lines and comments)
+	var lineNumber = (uint16)(0) // actual line number (excludes empty lines, comments, and tags)
 
 	// first pass: build line tag map
 	if err := utils.ForEachLine(assembly, func(index int, line string) error {
 		line = strings.TrimSpace(line)
 		// skip lines that are empty or start with a comment
-		if len(line) == 0 || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "#") {
+		if len(line) == 0 || strings.HasPrefix(line, ";") {
 			return nil
 		}
 		// get first token
@@ -68,10 +68,13 @@ func Assemble(assembly string, programROM []uint16) (uint, error) {
 			return nil
 		}
 		// if ends with a colon, it's a tag, add it to the map
-		if tokens[0][len(tokens[0])-1] == ':' {
+		if strings.HasSuffix(tokens[0], ":") {
+			// remove colon from tag then add it to the map
+			tokens[0] = tokens[0][:len(tokens[0])-1]
 			tagMap[tokens[0]] = lineNumber
+		} else {
+			lineNumber++
 		}
-		lineNumber++
 		return nil
 	}); err != nil {
 		return 0, err
@@ -80,12 +83,12 @@ func Assemble(assembly string, programROM []uint16) (uint, error) {
 	// second pass: assemble
 	lineNumber = 0 // reset line number for second pass
 	if err := utils.ForEachLine(assembly, func(index int, line string) error {
-		// check if program is too long, trim whitespace, skip empty lines and comments
+		// check if program is too long, trim whitespace, skip empty lines comments, and tags
 		if lineNumber > 255 {
 			return fmt.Errorf("program is too long. Max length is 256 instructions")
 		}
 		line = strings.TrimSpace(line)
-		if len(line) == 0 || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "#") {
+		if len(line) == 0 || strings.HasPrefix(line, ";") || strings.HasSuffix(line, ":") {
 			return nil
 		}
 
@@ -114,39 +117,40 @@ func Assemble(assembly string, programROM []uint16) (uint, error) {
 // ---- Private functions -----------------------------------------------------
 
 // convertPseudoInstruction converts pseudo instructions to real instructions.
-func convertPseudoInstruction(tokens []string) {
-	switch tokens[0] {
+func convertPseudoInstruction(tokens []string) []string {
+	if len(tokens) < 1 {
+		return tokens
+	}
+	switch strings.ToUpper(tokens[0]) {
 	case "NOP":
-		copy(tokens, []string{"ADD", "r0", "r0", "r0"})
+		return []string{"ADD", "r0", "r0", "r0"}
 	case "MOV":
-		copy(tokens, []string{"ADD", tokens[1], "r0", tokens[2]})
+		return []string{"ADD", tokens[1], "r0", tokens[2]}
 	case "JMP":
-		copy(tokens, []string{"BEQ", tokens[1], "r15"})
+		return []string{"BEQ", tokens[1], "r15"}
 	case "EXIT":
-		copy(tokens, []string{"JMPL", "r0", "r0"})
+		return []string{"JMPL", "r0", "r0"}
 	default:
-		return
+		return tokens
 	}
 }
 
 // parseInstruction returns the binary encoded equivalent of an assembly instruction.
 func parseInstruction(line string, tagMap map[string]uint16) (uint16, error) {
+	// replace all commas with spaces
+	line = strings.ReplaceAll(line, ",", " ")
+
 	// split line into tokens
 	tokens := strings.Fields(line)
 	if len(tokens) < 1 {
 		return 0, fmt.Errorf("error parsing instruction")
 	}
 
-	// if first token is a tag, remove it
-	if tokens[0][len(tokens[0])-1] == ':' {
-		tokens = tokens[1:]
-	}
-
 	// if it's a pseudo instruction, convert it to a real instruction
-	convertPseudoInstruction(tokens)
+	tokens = convertPseudoInstruction(tokens)
 
 	// get instruction
-	instruction, ok := instructions[tokens[0]]
+	instruction, ok := instructions[strings.ToUpper(tokens[0])]
 	if !ok {
 		return 0, fmt.Errorf("unknown instruction: %s", tokens[0])
 	}
@@ -199,21 +203,23 @@ func parseInstruction(line string, tagMap map[string]uint16) (uint16, error) {
 				return fmt.Errorf("error parsing immediate")
 			}
 
-			// if the last character is a colon, it's a tag
-			if input[len(input)-1] == ':' {
-				// get line number using tag
-				if line_number, ok := tagMap[input]; ok {
-					*out = uint8(line_number)
-					return nil
-				}
-				return fmt.Errorf("unknown line tag: %s", input)
-			} else {
-				// not a tag, parse number
+			isNumber := func(s string) bool {
+				_, err := strconv.Atoi(s)
+				return err == nil
+			}
+
+			if isNumber(input) {
 				if imm, err := strconv.ParseUint(input, 10, 8); err == nil {
 					*out = uint8(imm)
 					return nil
 				}
 				return fmt.Errorf("failed to parse immediate: %s", input)
+			} else {
+				if line_number, ok := tagMap[input]; ok {
+					*out = uint8(line_number)
+					return nil
+				}
+				return fmt.Errorf("unknown line tag: %s", input)
 			}
 		}
 	}

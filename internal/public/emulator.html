@@ -23,7 +23,7 @@
 
 <body class="h-dvh flex flex-col">
   <!-- navbar -->
-  <div class="navbar bg-base-300">
+  <div class="navbar bg-base-300 h-3.5">
     <div class="navbar-start h-full">
       <a href="/" class="h-full flex flex-row space-x-2">
         <img id="logo" class="h-full" src="" alt="logo" />
@@ -35,7 +35,8 @@
             logo.src = theme === 'dark' ? '/public/logo-darkmode.png' : '/public/logo-lightmode.png'
           })
         </script>
-        <span class="self-center font-semibold tracking-wide font-ProggyVector whitespace-nowrap">Rails</span>
+        <span
+          class="self-center font-semibold tracking-wide font-ProggyVector whitespace-nowrap hidden lg:block">Rails</span>
       </a>
     </div>
     <div class="navbar-end">
