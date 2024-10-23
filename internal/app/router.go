@@ -55,16 +55,16 @@ func NewRouter() *chi.Mux {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		// convert uint16 to js BigInts
-		bigInts := make([]string, length)
+		// convert uint16 to string numbers
+		numbers := make([]string, length)
 		for i := uint(0); i < length; i++ {
-			bigInts[i] = "BigInt(" + strconv.FormatUint(uint64(binary[i]), 10) + ")"
+			numbers[i] = strconv.FormatUint(uint64(binary[i]), 10)
 		}
 		// return the output program length and the assembled binary as a uint16 array
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"length": length,
-			"binary": bigInts,
+			"binary": numbers,
 		})
 	})
 

@@ -7,71 +7,42 @@
   <title>Rails</title>
   <link href="/public/css/output.css" rel="stylesheet">
   <script>
-    const themeChangeCallbacks = [];
     if (!localStorage.getItem('theme')) localStorage.setItem('theme', 'dark') // default to dark theme
     document.documentElement.setAttribute('data-theme', localStorage.getItem('theme')) // set theme on page load
-    window.setTheme = function (theme) {
-      localStorage.setItem('theme', theme)
-      document.documentElement.setAttribute('data-theme', theme)
-      themeChangeCallbacks.forEach(cb => cb(theme))
-    }
-    window.onThemeChange = function (cb) {
-      themeChangeCallbacks.push(cb)
+
+    async function assemble(assembly) {
+      const assemblyRes = await fetch('/api/assemble', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          assembly: assembly
+        })
+      });
+      if (!assemblyRes.ok) {
+        const errorText = await assemblyRes.text();
+        throw new Error(errorText || 'An error occurred');
+      }
+      const assemblyJson = await assemblyRes.json();
+      const convertedBin = assemblyJson.binary.map(str => BigInt(str))
+      return convertedBin
     }
   </script>
 </head>
 
-<body class="h-dvh flex flex-col">
-  <!-- navbar -->
-  <div class="navbar bg-base-300 h-3.5">
-    <div class="navbar-start h-full">
-      <a href="/" class="h-full flex flex-row space-x-2">
-        <img id="logo" class="h-full" src="" alt="logo" />
-        <script>
-          const logo = document.getElementById('logo')
-          logo.src = localStorage.getItem('theme') === 'dark' ? '/public/logo-darkmode.png' : '/public/logo-lightmode.png'
-          window.onThemeChange(theme => {
-            const logo = document.getElementById('logo')
-            logo.src = theme === 'dark' ? '/public/logo-darkmode.png' : '/public/logo-lightmode.png'
-          })
-        </script>
-        <span
-          class="self-center font-semibold tracking-wide font-ProggyVector whitespace-nowrap hidden lg:block">Rails</span>
-      </a>
-    </div>
-    <div class="navbar-end">
-      <label class="swap swap-rotate h-full ml-4">
-        <input id="dark-mode-btn" type="checkbox" />
-        <script>
-          const darkModeBtn = document.getElementById('dark-mode-btn')
-          darkModeBtn.checked = localStorage.getItem('theme') === 'dark'
-          darkModeBtn.addEventListener('change', () => {
-            setTheme(darkModeBtn.checked ? 'dark' : 'light')
-          })
-        </script>
-        <!-- sun icon -->
-        <svg class="swap-off h-10 w-10 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-          <path
-            d="M5.64,17l-.71.71a1,1,0,0,0,0,1.41,1,1,0,0,0,1.41,0l.71-.71A1,1,0,0,0,5.64,17ZM5,12a1,1,0,0,0-1-1H3a1,1,0,0,0,0,2H4A1,1,0,0,0,5,12Zm7-7a1,1,0,0,0,1-1V3a1,1,0,0,0-2,0V4A1,1,0,0,0,12,5ZM5.64,7.05a1,1,0,0,0,.7.29,1,1,0,0,0,.71-.29,1,1,0,0,0,0-1.41l-.71-.71A1,1,0,0,0,4.93,6.34Zm12,.29a1,1,0,0,0,.7-.29l.71-.71a1,1,0,1,0-1.41-1.41L17,5.64a1,1,0,0,0,0,1.41A1,1,0,0,0,17.66,7.34ZM21,11H20a1,1,0,0,0,0,2h1a1,1,0,0,0,0-2Zm-9,8a1,1,0,0,0-1,1v1a1,1,0,0,0,2,0V20A1,1,0,0,0,12,19ZM18.36,17A1,1,0,0,0,17,18.36l.71.71a1,1,0,0,0,1.41,0,1,1,0,0,0,0-1.41ZM12,6.5A5.5,5.5,0,1,0,17.5,12,5.51,5.51,0,0,0,12,6.5Zm0,9A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z" />
-        </svg>
-        <!-- moon icon -->
-        <svg class="swap-on h-10 w-10 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-          <path
-            d="M21.64,13a1,1,0,0,0-1.05-.14,8.05,8.05,0,0,1-3.37.73A8.15,8.15,0,0,1,9.08,5.49a8.59,8.59,0,0,1,.25-2A1,1,0,0,0,8,2.36,10.14,10.14,0,1,0,22,14.05,1,1,0,0,0,21.64,13Zm-9.5,6.69A8.14,8.14,0,0,1,7.08,5.22v.27A10.15,10.15,0,0,0,17.22,15.63a9.79,9.79,0,0,0,2.1-.22A8.11,8.11,0,0,1,12.14,19.73Z" />
-        </svg>
-      </label>
-    </div>
-  </div>
-  <!-- main contents -->
-  <div class="w-full flex-grow flex flex-col 2xl:flex-row space-y-4 2xl:space-y-0 2xl:space-x-4 p-4">
-    <div class="w-[600px] h-full bg-base-200 rounded p-4 flex flex-col space-y-4">
+<body class="max-w-[1865px]">
+  <div class="w-full max-h-screen flex flex-col 2xl:flex-row space-y-4 2xl:space-y-0 2xl:space-x-4 p-4">
+
+    <!-- panel one -->
+    <div class="w-[600px] max-h-[1200px] 2xl:grow bg-base-200 rounded p-4 flex flex-col space-y-4">
       <h3 class="font-bold text-lg">Assembly</h3>
       <div class="flex flex-row mb-2 space-x-2">
         <button class="btn btn-sm btn-primary" onclick="loadAssembly()">Load</button>
         <button class="btn btn-sm btn-primary" onclick="saveAssembly()">Save</button>
         <button class="btn btn-sm btn-primary" onclick="flashAssembly()">Flash Program ROM</button>
       </div>
-      <div id="editor" class="flex-grow"></div> <!-- height issue on vertical mode -->
+      <div id="editor" class="h-[1200px] 2xl:h-auto 2xl:grow"></div> <!-- height issue on vertical mode -->
       <script src="/public/ace/ace.js" type="text/javascript" charset="utf-8"></script>
       <script src="/public/ace/rails_assembly_highlight_rules.js" type="text/javascript" charset="utf-8"></script>
       <script src="/public/ace/mode-rails_assembly.js" type="text/javascript" charset="utf-8"></script>
@@ -80,17 +51,103 @@
         var editor = ace.edit("editor");
         editor.setTheme("ace/theme/github_dark");
         editor.session.setMode("ace/mode/rails_assembly");
+
+        async function flashAssembly() {
+          const assembly = editor.getValue()
+          const binary = await assemble(assembly)
+          loadProgramROM(binary)
+        }
       </script>
     </div>
-    <div class="w-[600px] h-full bg-base-200 rounded p-4">
+
+    <!-- panel two -->
+    <div class="w-[600px] max-h-[1200px] 2xl:grow bg-base-200 rounded p-4 flex flex-col space-y-4">
       <h3 class="font-bold text-lg">Controls</h3>
       <div class="flex flex-row mb-2 space-x-2">
         <button class="btn btn-sm btn-primary" onclick="start()">Start</button>
         <button class="btn btn-sm btn-primary" onclick="stop()">Stop</button>
         <button class="btn btn-sm btn-primary" onclick="step()">Step</button>
         <button class="btn btn-sm btn-primary" onclick="reset()">Reset</button>
+        <div class="divider divider-vertical"></div>
+        <!-- pc stuff -->
       </div>
-      <!-- start, stop, step, reset, and pc / carry reg -->
+      <h3 class="font-bold text-lg">Program ROM</h3>
+      <div id="program" class="flex flex-col h-full overflow-y-scroll space-y-1"></div>
+      <div class="hidden p-0 m-0"></div>
+      <script>
+        /* Example:
+        <div class="flex flex-row w-full h-8 bg-base-100 rounded items-center justify-around" data-address=0>
+          <span class="text-center flex items-center justify-center font-bold">address number here e.g "000:"</div>
+          <span class="text-center flex items-center justify-center" data-bitIndex=0>0</div>
+          <span class="text-center flex items-center justify-center" data-bitIndex=1>0</div>
+          <span class="text-center flex items-center justify-center" data-bitIndex=2>0</div>
+          <span class="text-center flex items-center justify-center" data-bitIndex=3>0</div>
+          <span class="text-center flex items-center justify-center">-</div>
+          repeat the above content 3 more times, minus the address span and the div on the last one...
+        </div>
+        */
+        function genPromInstruction(address) {
+          const cell = document.createElement('div')
+          cell.classList.add('flex', 'flex-row', 'w-full', 'h-8', 'bg-base-100', 'rounded', 'items-center', 'justify-around')
+          cell.dataset.address = address
+          const addressSpan = document.createElement('span')
+          addressSpan.classList.add('text-center', 'flex', 'items-center', 'justify-center', 'font-bold')
+          addressSpan.textContent = `${address.toString(10).padStart(3, '0')}:`
+          cell.appendChild(addressSpan)
+          for (let i = 0; i < 16; i++) {
+            const bitSpan = document.createElement('span')
+            bitSpan.classList.add('text-center', 'flex', 'items-center', 'justify-center')
+            bitSpan.dataset.bitIndex = i
+            bitSpan.textContent = '0'
+            cell.appendChild(bitSpan)
+            if (i % 4 === 3 && i !== 15) {
+              const divider = document.createElement('span')
+              divider.classList.add('text-center', 'flex', 'items-center', 'justify-center')
+              divider.textContent = '-'
+              cell.appendChild(divider)
+            }
+          }
+          return cell
+        }
+
+        const program = document.getElementById('program')
+        for (let i = 0; i < 256; i++) {
+          program.appendChild(genPromInstruction(i))
+        }
+
+        // set to -1 to clear all highlights
+        function highlightInstruction(address) {
+          const cells = program.children
+          for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i]
+            if (parseInt(cell.dataset.address) === address) {
+              cell.classList.add('-hue-rotate-60')
+              // cell.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            } else {
+              cell.classList.remove('-hue-rotate-60')
+            }
+          }
+        }
+
+        // instructions is a 256 length array of BigInts
+        function loadProgramROM(instructions) {
+          const cells = program.children
+          for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i]
+            const instruction = i < instructions.length ? instructions[i] : 0n
+            for (let j = 0; j < 16; j++) {
+              const bitSpan = cell.querySelector(`span[data-bit-index="${15 - j}"]`)
+              bitSpan.textContent = instruction & (1n << BigInt(j)) ? '1' : '0'
+            }
+          }
+        }
+
+        highlightInstruction(0)
+      </script>
+    </div>
+
+    <!-- panel three -->
+    <div class="w-[600px] max-h-[1200px] 2xl:grow bg-base-200 rounded p-4 space-y-4">
       <h3 class="font-bold text-lg">I/O registers</h3>
       <div class="flex flex-row mb-2 space-x-2">
         <div class="font-semibold text-center flex items-center justify-center">Address:</div>
@@ -100,6 +157,7 @@
         <input id="io_in_value" type="number" max="255" min="0" placeholder="0"
           class="input input-bordered max-h-8 max-w-16" />
         <button class="btn btn-sm btn-primary" onclick="setIoReg()">Set</button>
+        <!-- add reset io btn -->
       </div>
       <div id="ioregs" class="grid grid-cols-16 gap-1"></div>
       <script>
@@ -130,8 +188,6 @@
           ioregs.appendChild(genIoCell(i))
         }
       </script>
-    </div>
-    <div class="w-[600px] h-full bg-base-200 rounded p-4 space-y-4">
       <h3 class="font-bold text-lg">Register file</h3>
       <div id="regfile" class="grid grid-cols-16 gap-1"></div>
       <h3 class="font-bold text-lg">Memory</h3>
@@ -143,7 +199,7 @@
           cell.classList.add('tooltip', 'w-8', 'h-8', 'bg-base-100', 'text-center', 'flex', 'items-center', 'justify-center', 'rounded')
           cell.dataset.tip = `0x${address.toString(16).padStart(2, '0')}`
           cell.dataset.address = address
-          cell.textContent = '0'
+          cell.textContent = address.toString(10).padStart(3, '0')
           return cell
         }
 
@@ -160,6 +216,45 @@
         const memory = document.getElementById('memory')
         for (let i = 0; i < 256; i++) {
           memory.appendChild(genCell(i))
+        }
+
+        // -1 to clear highlights for given action
+        function updateRegfile(readAddr, writeAddr, writeData) {
+          const cells = regfile.children
+          for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i]
+            const address = parseInt(cell.dataset.address)
+            // update readAddr
+            if (address === readAddr) {
+              cell.classList.add('-hue-rotate-90')
+            } else {
+              cell.classList.remove('-hue-rotate-90')
+            }
+            // update writeAddr
+            if (address === writeAddr) {
+              cell.classList.add('-hue-rotate-60')
+            } else {
+              cell.classList.remove('-hue-rotate-60')
+            }
+            if (address === writeAddr) {
+              cell.textContent = writeData.toString(10)
+            }
+          }
+        }
+
+        // -1 to clear all highlight
+        function updateMemory(address, isWrite, data) {
+          const cells = memory.children
+          for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i]
+            const cellAddress = parseInt(cell.dataset.address)
+            if (cellAddress === address) {
+              cell.classList.add(isWrite ? '-hue-rotate-60' : '-hue-rotate-90')
+              cell.textContent = data.toString(10)
+            } else {
+              cell.classList.remove(isWrite ? '-hue-rotate-60' : '-hue-rotate-90')
+            }
+          }
         }
       </script>
     </div>
