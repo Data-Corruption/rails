@@ -29,6 +29,9 @@
       return convertedBin
     }
   </script>
+
+  <script type="text/javascript" src="/public/emulator.js"></script>
+  <script>const emulator = new RailsEmulator();</script>
 </head>
 
 <body class="max-w-[1865px]">
@@ -63,13 +66,28 @@
     <!-- panel two -->
     <div class="w-[600px] max-h-[1200px] 2xl:grow bg-base-200 rounded p-4 flex flex-col space-y-4">
       <h3 class="font-bold text-lg">Controls</h3>
-      <div class="flex flex-row mb-2 space-x-2">
-        <button class="btn btn-sm btn-primary" onclick="start()">Start</button>
-        <button class="btn btn-sm btn-primary" onclick="stop()">Stop</button>
-        <button class="btn btn-sm btn-primary" onclick="step()">Step</button>
-        <button class="btn btn-sm btn-primary" onclick="reset()">Reset</button>
-        <div class="divider divider-vertical"></div>
-        <!-- pc stuff -->
+      <div class="flex flex-row space-x-2">
+        <button class="btn btn-sm btn-primary" onclick="emulator.Start()">Start</button>
+        <button class="btn btn-sm btn-primary" onclick="emulator.Stop()">Stop</button>
+        <button class="btn btn-sm btn-primary" onclick="emulator.Step()">Step</button>
+        <button class="btn btn-sm btn-primary" onclick="emulator.Reset()">Reset</button>
+        <!-- pc -->
+        <div class="font-semibold text-center flex items-center justify-center">PC:</div>
+        <div id="pc" class="font-semibold text-center flex items-center justify-center">0</div>
+        <input id="pc_jump_address" type="number" max="255" min="0" value="0"
+          class="input input-bordered max-h-8 max-w-16" />
+        <button class="btn btn-sm btn-primary" onclick="jump()">Jump</button>
+        <div class="font-semibold text-center flex items-center justify-center">C/B Flag:</div>
+        <div id="carry" class="font-semibold text-center flex items-center justify-center">0</div>
+        <script>
+          const pc = document.getElementById('pc')
+          function jump() {
+            const address = document.getElementById('pc_jump_address').value
+            emulator.ProgramCounter = BigInt(address)
+            pc.textContent = address
+            highlightInstruction(address)
+          }
+        </script>
       </div>
       <h3 class="font-bold text-lg">Program ROM</h3>
       <div id="program" class="flex flex-col h-full overflow-y-scroll space-y-1"></div>
@@ -120,7 +138,7 @@
           const cells = program.children
           for (let i = 0; i < cells.length; i++) {
             const cell = cells[i]
-            if (parseInt(cell.dataset.address) === address) {
+            if (parseInt(cell.dataset.address) === Number(address)) {
               cell.classList.add('-hue-rotate-60')
               // cell.scrollIntoView({ behavior: 'smooth', block: 'center' })
             } else {
@@ -131,6 +149,7 @@
 
         // instructions is a 256 length array of BigInts
         function loadProgramROM(instructions) {
+          // update ui
           const cells = program.children
           for (let i = 0; i < cells.length; i++) {
             const cell = cells[i]
@@ -140,6 +159,8 @@
               bitSpan.textContent = instruction & (1n << BigInt(j)) ? '1' : '0'
             }
           }
+          // update emulator
+          emulator.ProgramRom = instructions
         }
 
         highlightInstruction(0)
@@ -149,12 +170,12 @@
     <!-- panel three -->
     <div class="w-[600px] max-h-[1200px] 2xl:grow bg-base-200 rounded p-4 space-y-4">
       <h3 class="font-bold text-lg">I/O registers</h3>
-      <div class="flex flex-row mb-2 space-x-2">
+      <div class="flex flex-row space-x-2">
         <div class="font-semibold text-center flex items-center justify-center">Address:</div>
-        <input id="io_in_address" type="number" max="255" min="0" placeholder="0"
+        <input id="io_in_address" type="number" max="255" min="0" value="0"
           class="input input-bordered max-h-8 max-w-16" />
         <div class="font-semibold text-center flex items-center justify-center">Value:</div>
-        <input id="io_in_value" type="number" max="255" min="0" placeholder="0"
+        <input id="io_in_value" type="number" max="255" min="0" value="0"
           class="input input-bordered max-h-8 max-w-16" />
         <button class="btn btn-sm btn-primary" onclick="setIoReg()">Set</button>
         <!-- add reset io btn -->
@@ -187,6 +208,14 @@
         for (let i = 0; i < 16; i++) {
           ioregs.appendChild(genIoCell(i))
         }
+
+        function setIoReg() {
+          const address = document.getElementById('io_in_address').value
+          const value = document.getElementById('io_in_value').value
+          emulator.InRegisters[address] = BigInt(value)
+          const cell = ioregs.children[address]
+          cell.children[0].textContent = value
+        }
       </script>
       <h3 class="font-bold text-lg">Register file</h3>
       <div id="regfile" class="grid grid-cols-16 gap-1"></div>
@@ -218,44 +247,7 @@
           memory.appendChild(genCell(i))
         }
 
-        // -1 to clear highlights for given action
-        function updateRegfile(readAddr, writeAddr, writeData) {
-          const cells = regfile.children
-          for (let i = 0; i < cells.length; i++) {
-            const cell = cells[i]
-            const address = parseInt(cell.dataset.address)
-            // update readAddr
-            if (address === readAddr) {
-              cell.classList.add('-hue-rotate-90')
-            } else {
-              cell.classList.remove('-hue-rotate-90')
-            }
-            // update writeAddr
-            if (address === writeAddr) {
-              cell.classList.add('-hue-rotate-60')
-            } else {
-              cell.classList.remove('-hue-rotate-60')
-            }
-            if (address === writeAddr) {
-              cell.textContent = writeData.toString(10)
-            }
-          }
-        }
-
-        // -1 to clear all highlight
-        function updateMemory(address, isWrite, data) {
-          const cells = memory.children
-          for (let i = 0; i < cells.length; i++) {
-            const cell = cells[i]
-            const cellAddress = parseInt(cell.dataset.address)
-            if (cellAddress === address) {
-              cell.classList.add(isWrite ? '-hue-rotate-60' : '-hue-rotate-90')
-              cell.textContent = data.toString(10)
-            } else {
-              cell.classList.remove(isWrite ? '-hue-rotate-60' : '-hue-rotate-90')
-            }
-          }
-        }
+        emulator.Init()
       </script>
     </div>
 

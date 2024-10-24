@@ -2,7 +2,7 @@
 class Emulator {
   constructor() {
     this.StepRateLimit = 100; // min ms between each execution step when running
-    this.UiUpdateLimit = 1000; // min ms between UI updates
+    this.UiUpdateLimit = 250; // min ms between UI updates
     this.isRunning = false;
     this.stopRequested = false;
     this.lastUiUpdate = 0; // timestamp of the last UI update
@@ -32,7 +32,7 @@ class Emulator {
   // Start() starts the emulator. It initializes the emulator if it hasn't been initialized yet.
   Start() {
     if (!this.initialized) {
-      this.#init();
+      this.Init();
     }
     this.isRunning = true;
     this.stopRequested = false;
@@ -75,8 +75,8 @@ class Emulator {
     return Promise.resolve();
   }
 
-  // init() initializes the emulator and starts the main loop.
-  #init() {
+  // Init() initializes the emulator and starts the main loop.
+  Init() {
     if (this.initialized) {
       return;
     }
@@ -121,6 +121,7 @@ class RailsEmulator extends Emulator {
     const instruction = this.ProgramRom[this.ProgramCounter];
     // if 1101 0000 0000 0000 (exit instruction) is encountered, stop the emulator
     if (instruction === 0xd000n) {
+      console.log("Exit instruction encountered");
       return false;
     }
 
@@ -222,7 +223,34 @@ class RailsEmulator extends Emulator {
   }
 
   UpdateUI() {
-    console.log("UI update logic here");
+    // update program counter
+    const pc = document.getElementById('pc')
+    pc.textContent = this.ProgramCounter.toString(10);
+
+    // update carry flag
+    const carry = document.getElementById('carry')
+    carry.textContent = this.CarryFlag ? "1" : "0";
+
+    // update program rom
+    highlightInstruction(this.ProgramCounter);
+
+    // update i/o registers
+    const ioregs = document.getElementById("ioregs");
+    for (let i = 0; i < 16; i++) {
+      ioregs.children[i].children[1].textContent = this.OutRegisters[i].toString(10);
+    }
+
+    // update register file
+    const regfile = document.getElementById("regfile");
+    for (let i = 0; i < 16; i++) {
+      regfile.children[i].textContent = this.RegisterFile[i].toString(10);
+    }
+
+    // update ram
+    const memory = document.getElementById('memory')
+    for (let i = 0; i < 256; i++) {
+      memory.children[i].textContent = this.Ram[i].toString(10);
+    }
   }
 
   async Reset() {
