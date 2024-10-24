@@ -37,6 +37,21 @@
 <body class="max-w-[1865px]">
   <div class="w-full max-h-screen flex flex-col 2xl:flex-row space-y-4 2xl:space-y-0 2xl:space-x-4 p-4">
 
+    <style>
+      .ace_gutter-cell.ace_breakpoint::before {
+        content: "";
+        display: inline-block;
+        position: absolute;
+        left: 4px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 8px;
+        height: 8px;
+        background-color: red;
+        border-radius: 50%;
+      }
+    </style>
+
     <!-- panel one -->
     <div class="w-[600px] max-h-[1200px] 2xl:grow bg-base-200 rounded p-4 flex flex-col space-y-4">
       <h3 class="font-bold text-lg">Assembly</h3>
@@ -55,10 +70,40 @@
         editor.setTheme("ace/theme/github_dark");
         editor.session.setMode("ace/mode/rails_assembly");
 
+        editor.on("guttermousedown", function (e) {
+          var target = e.domEvent.target;
+          if (target.className.indexOf("ace_gutter-cell") == -1) { return; }
+          if (!editor.isFocused()) { return; }
+          if (e.clientX > 25 + target.getBoundingClientRect().left) { return; }
+
+          var breakpoints = e.editor.session.getBreakpoints(row, 0);
+          var row = e.getDocumentPosition().row;
+          if (typeof breakpoints[row] === typeof undefined)
+            e.editor.session.setBreakpoint(row);
+          else
+            e.editor.session.clearBreakpoint(row);
+          e.stop();
+        })
+
+        function getBreakpointLines() {
+          const breakpoints = editor.session.getBreakpoints();
+          const breakpointLines = [];
+          for (let line in breakpoints) {
+            if (breakpoints[line]) {
+              breakpointLines.push(parseInt(line));
+            }
+          }
+          return breakpointLines;
+        }
+
         async function flashAssembly() {
           const assembly = editor.getValue()
           const binary = await assemble(assembly)
           loadProgramROM(binary)
+          breakPoints = getBreakpointLines()
+          breakPoints.forEach(line => {
+            console.log(line)
+          })
         }
       </script>
     </div>
@@ -89,6 +134,54 @@
           }
         </script>
       </div>
+      <div class="flex flex-row space-x-2">
+        <div class="w-2/5 font-semibold text-center flex items-center justify-center">Max Emulation Update:</div>
+        <div class="grow">
+          <input id="max_emulator_update" type="range" min="0" max="1000" value="750"
+            class="range range-xs range-primary" step="250" />
+          <div class="flex w-full justify-between px-2 text-xs">
+            <span>1Hz</span>
+            <span>|</span>
+            <span>|</span>
+            <span>|</span>
+            <span>1Khz</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex flex-row space-x-2">
+        <div class="w-2/5 font-semibold text-center flex items-center justify-center">Max UI Update:</div>
+        <div class="grow">
+          <input id="max_ui_update" type="range" min="0" max="1000" value="750" class="range range-xs range-primary"
+            step="250" />
+          <div class="flex w-full justify-between px-2 text-xs">
+            <span>1Hz</span>
+            <span>|</span>
+            <span>|</span>
+            <span>|</span>
+            <span>1Khz</span>
+          </div>
+        </div>
+      </div>
+      <script>
+        const maxEmulatorUpdate = document.getElementById('max_emulator_update')
+        const maxUiUpdate = document.getElementById('max_ui_update')
+        maxEmulatorUpdate.addEventListener('input', () => {
+          let maxEm = Number(maxEmulatorUpdate.value)
+          emulator.StepRateLimit = 1001 - maxEm
+          if (Number(maxUiUpdate.value) > maxEm) {
+            maxUiUpdate.value = maxEmulatorUpdate.value
+            emulator.UiUpdateLimit = 1001 - maxEm
+          }
+        })
+        maxUiUpdate.addEventListener('input', () => {
+          let maxUi = Number(maxUiUpdate.value)
+          emulator.UiUpdateLimit = 1001 - maxUi
+          if (maxUi > Number(maxEmulatorUpdate.value)) {
+            maxEmulatorUpdate.value = maxUiUpdate.value
+            emulator.StepRateLimit = 1001 - maxUi
+          }
+        })
+      </script>
       <h3 class="font-bold text-lg">Program ROM</h3>
       <div id="program" class="flex flex-col h-full overflow-y-scroll space-y-1"></div>
       <div class="hidden p-0 m-0"></div>
@@ -139,10 +232,11 @@
           for (let i = 0; i < cells.length; i++) {
             const cell = cells[i]
             if (parseInt(cell.dataset.address) === Number(address)) {
-              cell.classList.add('-hue-rotate-60')
+              cell.classList.add('bg-base-300')
               // cell.scrollIntoView({ behavior: 'smooth', block: 'center' })
             } else {
-              cell.classList.remove('-hue-rotate-60')
+              cell.classList.remove('bg-base-300')
+              cell.classList.add('bg-base-100')
             }
           }
         }

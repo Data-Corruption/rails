@@ -1,7 +1,7 @@
 // Emulator represents a generic emulator that can be started, stopped, individually stepped, and reset.
 class Emulator {
   constructor() {
-    this.StepRateLimit = 100; // min ms between each execution step when running
+    this.StepRateLimit = 250; // min ms between each execution step when running
     this.UiUpdateLimit = 250; // min ms between UI updates
     this.isRunning = false;
     this.stopRequested = false;
@@ -115,6 +115,12 @@ class RailsEmulator extends Emulator {
     this.ProgramCounter = 0n;
     this.CarryFlag = false;
     this.Breakpoints = [];
+    // perf stuff
+    this.modifiedRegisterFile = true;
+    this.modifiedRam = true;
+    this.modifiedOutRegisters = true;
+    this.modifiedProgramCounter = true;
+    this.modifiedCarryFlag = true;
   }
 
   Step() {
@@ -134,12 +140,37 @@ class RailsEmulator extends Emulator {
       }
     }
 
+    // if 0000 0000 0000 0000 (nop instruction) is encountered, continue to next instruction
+    if (instruction === 0x0000n) {
+      this.ProgramCounter++;
+      this.modifiedProgramCounter = true;
+      return true;
+    }
+
     const BYTE_MASK = 0x00ffn;
     const opcode = (instruction & 0xf000n) >> 12n;
     const a = (instruction & 0x0f00n) >> 8n;
     const b = (instruction & 0x00f0n) >> 4n;
     const c = instruction & 0x000fn;
     const imm = (instruction & 0x0ff0n) >> 4n;
+
+    const regfileModInsts = [0n, 1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 13n, 14n];
+    const ramModInsts = [9n, 10n];
+    const outRegModInsts = [15n];
+    const carryModInsts = [0n, 1n, 2n, 3n, 11n, 12n, 13n];
+
+    if (regfileModInsts.includes(opcode)) {
+      this.modifiedRegisterFile = true;
+    }
+    if (ramModInsts.includes(opcode)) {
+      this.modifiedRam = true;
+    }
+    if (outRegModInsts.includes(opcode)) {
+      this.modifiedOutRegisters = true;
+    }
+    if (carryModInsts.includes(opcode)) {
+      this.modifiedCarryFlag = true;
+    }
 
     let result;
 
@@ -190,6 +221,7 @@ class RailsEmulator extends Emulator {
       case 11n: // BEQ
         if (this.RegisterFile[15] === this.RegisterFile[Number(c)]) {
           this.ProgramCounter = imm;
+          this.modifiedProgramCounter = true;
           this.CarryFlag = false;
           return true;
         }
@@ -197,6 +229,7 @@ class RailsEmulator extends Emulator {
       case 12n: // BGT
         if (this.RegisterFile[15] > this.RegisterFile[Number(c)]) {
           this.ProgramCounter = imm;
+          this.modifiedProgramCounter = true;
           this.CarryFlag = false;
           return true;
         }
@@ -205,6 +238,7 @@ class RailsEmulator extends Emulator {
         this.RegisterFile[Number(c)] = this.ProgramCounter + 1n;
         this.RegisterFile[0] = 0n; // ensure reg 0 is always 0
         this.ProgramCounter = this.RegisterFile[Number(a)];
+        this.modifiedProgramCounter = true;
         this.CarryFlag = false;
         return true;
       case 14n: // IN
@@ -219,37 +253,47 @@ class RailsEmulator extends Emulator {
     }
     this.RegisterFile[0] = 0n; // ensure reg 0 is always 0
     this.ProgramCounter++;
+    this.modifiedProgramCounter = true;
     return true;
   }
 
   UpdateUI() {
     // update program counter
-    const pc = document.getElementById('pc')
-    pc.textContent = this.ProgramCounter.toString(10);
-
+    if (this.modifiedProgramCounter) {
+      const pc = document.getElementById("pc");
+      pc.textContent = this.ProgramCounter.toString(10);
+      highlightInstruction(this.ProgramCounter);
+      this.modifiedProgramCounter = false;
+    }
     // update carry flag
-    const carry = document.getElementById('carry')
-    carry.textContent = this.CarryFlag ? "1" : "0";
-
-    // update program rom
-    highlightInstruction(this.ProgramCounter);
-
+    if (this.modifiedCarryFlag) {
+      const carry = document.getElementById("carry");
+      carry.textContent = this.CarryFlag ? "1" : "0";
+      this.modifiedCarryFlag = false;
+    }
     // update i/o registers
-    const ioregs = document.getElementById("ioregs");
-    for (let i = 0; i < 16; i++) {
-      ioregs.children[i].children[1].textContent = this.OutRegisters[i].toString(10);
+    if (this.modifiedOutRegisters) {
+      const ioregs = document.getElementById("ioregs");
+      for (let i = 0; i < 16; i++) {
+        ioregs.children[i].children[1].textContent = this.OutRegisters[i].toString(10);
+      }
+      this.modifiedOutRegisters = false;
     }
-
     // update register file
-    const regfile = document.getElementById("regfile");
-    for (let i = 0; i < 16; i++) {
-      regfile.children[i].textContent = this.RegisterFile[i].toString(10);
+    if (this.modifiedRegisterFile) {
+      const regfile = document.getElementById("regfile");
+      for (let i = 0; i < 16; i++) {
+        regfile.children[i].textContent = this.RegisterFile[i].toString(10);
+      }
+      this.modifiedRegisterFile = false;
     }
-
     // update ram
-    const memory = document.getElementById('memory')
-    for (let i = 0; i < 256; i++) {
-      memory.children[i].textContent = this.Ram[i].toString(10);
+    if (this.modifiedRam) {
+      const memory = document.getElementById("memory");
+      for (let i = 0; i < 256; i++) {
+        memory.children[i].textContent = this.Ram[i].toString(10);
+      }
+      this.modifiedRam = false;
     }
   }
 
@@ -261,6 +305,11 @@ class RailsEmulator extends Emulator {
     this.OutRegisters.fill(0n);
     this.ProgramCounter = 0n;
     this.CarryFlag = false;
+    this.modifiedRegisterFile = true;
+    this.modifiedRam = true;
+    this.modifiedOutRegisters = true;
+    this.modifiedProgramCounter = true;
+    this.modifiedCarryFlag = true;
     console.log("Emulator reset");
   }
 }
