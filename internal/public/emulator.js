@@ -115,7 +115,8 @@ class RailsEmulator extends Emulator {
     this.ProgramCounter = 0n;
     this.CarryFlag = false;
     this.Breakpoints = [];
-    // perf stuff
+    this.stopMessage = null;
+    // perf stuff to avoid unnecessary UI updates
     this.modifiedRegisterFile = true;
     this.modifiedRam = true;
     this.modifiedOutRegisters = true;
@@ -127,7 +128,8 @@ class RailsEmulator extends Emulator {
     const instruction = this.ProgramRom[this.ProgramCounter];
     // if 1101 0000 0000 0000 (exit instruction) is encountered, stop the emulator
     if (instruction === 0xd000n) {
-      console.log("Exit instruction encountered");
+      console.log(`Exit instruction hit at ${this.ProgramCounter}`);
+      this.stopMessage = "Exit Instruction Hit!";
       return false;
     }
 
@@ -135,6 +137,7 @@ class RailsEmulator extends Emulator {
     if (this.isRunning) {
       if (this.Breakpoints.includes(Number(this.ProgramCounter))) {
         this.isRunning = false;
+        this.stopMessage = "Breakpoint Hit!";
         console.log(`Breakpoint hit at ${this.ProgramCounter}`);
         return false;
       }
@@ -249,6 +252,7 @@ class RailsEmulator extends Emulator {
         break;
       default:
         console.log(`Invalid opcode: ${opcode}`);
+        this.stopMessage = `Invalid opcode: ${opcode}`;
         return false;
     }
     this.RegisterFile[0] = 0n; // ensure reg 0 is always 0
@@ -258,20 +262,17 @@ class RailsEmulator extends Emulator {
   }
 
   UpdateUI() {
-    // update program counter
     if (this.modifiedProgramCounter) {
       const pc = document.getElementById("pc");
       pc.textContent = this.ProgramCounter.toString(10);
       highlightInstruction(this.ProgramCounter);
       this.modifiedProgramCounter = false;
     }
-    // update carry flag
     if (this.modifiedCarryFlag) {
       const carry = document.getElementById("carry");
       carry.textContent = this.CarryFlag ? "1" : "0";
       this.modifiedCarryFlag = false;
     }
-    // update i/o registers
     if (this.modifiedOutRegisters) {
       const ioregs = document.getElementById("ioregs");
       for (let i = 0; i < 16; i++) {
@@ -279,7 +280,6 @@ class RailsEmulator extends Emulator {
       }
       this.modifiedOutRegisters = false;
     }
-    // update register file
     if (this.modifiedRegisterFile) {
       const regfile = document.getElementById("regfile");
       for (let i = 0; i < 16; i++) {
@@ -287,13 +287,37 @@ class RailsEmulator extends Emulator {
       }
       this.modifiedRegisterFile = false;
     }
-    // update ram
     if (this.modifiedRam) {
       const memory = document.getElementById("memory");
       for (let i = 0; i < 256; i++) {
         memory.children[i].textContent = this.Ram[i].toString(10);
       }
       this.modifiedRam = false;
+    }
+
+    if (this.stopMessage) {
+      const toasts = document.getElementById("toasts");
+      const toast = document.createElement("div");
+      toast.classList.add(
+        "alert",
+        "alert-warning",
+        "opacity-100",
+        "transition-opacity",
+        "duration-500",
+        "ease-in-out"
+      );
+      const span = document.createElement("span");
+      span.textContent = this.stopMessage;
+      toast.appendChild(span);
+      toasts.appendChild(toast);
+      // after 3 seconds, start the fade-out transition
+      setTimeout(() => {
+        toast.classList.replace("opacity-100", "opacity-0");
+        toast.addEventListener("transitionend", () => {
+          toast.remove();
+        });
+      }, 3000);
+      this.stopMessage = null;
     }
   }
 

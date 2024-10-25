@@ -88,7 +88,14 @@ func Assemble(assembly string, programROM []uint16) (uint, error) {
 			return fmt.Errorf("program is too long. Max length is 256 instructions")
 		}
 		line = strings.TrimSpace(line)
-		if len(line) == 0 || strings.HasPrefix(line, ";") || strings.HasSuffix(line, ":") {
+		if len(line) == 0 || strings.HasPrefix(line, ";") {
+			return nil
+		}
+		tokens := strings.Fields(line)
+		if len(tokens) == 0 || len(tokens[0]) == 0 {
+			return nil
+		}
+		if strings.HasSuffix(tokens[0], ":") {
 			return nil
 		}
 
