@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rails</title>
+  <link href="/public/css/output.css" rel="stylesheet">
+  <script>
+    if (!localStorage.getItem('theme')) localStorage.setItem('theme', 'dark') // default to dark theme
+    document.documentElement.setAttribute('data-theme', localStorage.getItem('theme')) // set theme on page load
+
+    async function assemble(assembly) {
+      const assemblyRes = await fetch('/api/assemble', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          assembly: assembly
+        })
+      });
+      if (!assemblyRes.ok) {
+        const errorText = await assemblyRes.text();
+        throw new Error(errorText || 'An error occurred');
+      }
+      const assemblyJson = await assemblyRes.json();
+      const convertedBin = assemblyJson.binary.map(str => BigInt(str))
+      return convertedBin
+    }
+  </script>
+
+  <script type="text/javascript" src="/public/emulator.js"></script>
+  <script>const emulator = new RailsEmulator();</script>
+</head>
+
+<body class="max-w-[1865px]">
+
+  <div id="toasts" class="toast toast-end z-[100]"></div>
+
+  <div class="w-full max-h-screen flex flex-col 2xl:flex-row space-y-4 2xl:space-y-0 2xl:space-x-4 p-4">
+
+    <style>
+      .ace_gutter-cell.ace_breakpoint::before {
+        content: "";
+        display: inline-block;
+        position: absolute;
+        left: 4px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 8px;
+        height: 8px;
+        background-color: red;
+        border-radius: 50%;
+      }
+    </style>
+
+    <!-- panel one -->
+    <div class="w-[600px] max-h-[1200px] 2xl:grow bg-base-200 rounded p-4 flex flex-col space-y-4">
+      <h3 class="font-bold text-lg">Assembly</h3>
+      <div class="flex flex-row mb-2 space-x-2">
+        <button class="btn btn-sm btn-primary" onclick="loadAssembly()">Load</button>
+        <button class="btn btn-sm btn-primary" onclick="saveAssembly()">Save</button>
+        <button class="btn btn-sm btn-primary" onclick="flashAssembly()">Flash Program ROM</button>
+      </div>
+      <div class="text-xs text-gray-500">Note: Breakpoints only update on flash</div>
+      <div id="editor" class="h-[1200px] 2xl:h-auto 2xl:grow"></div> <!-- height issue on vertical mode -->
+      <script src="/public/ace/ace.js" type="text/javascript" charset="utf-8"></script>
+      <script src="/public/ace/rails_assembly_highlight_rules.js" type="text/javascript" charset="utf-8"></script>
+      <script src="/public/ace/mode-rails_assembly.js" type="text/javascript" charset="utf-8"></script>
+      <script>
+        ace.config.set("basePath", "/public/ace");
+        var editor = ace.edit("editor");
+        editor.setTheme("ace/theme/github_dark");
+        editor.session.setMode("ace/mode/rails_assembly");
+        var machineToBreakpointMap = {}; // maybe use later for highlighting
+
+        editor.on("guttermousedown", function (e) {
+          var target = e.domEvent.target;
+          if (target.className.indexOf("ace_gutter-cell") == -1) { return; }
+          if (!editor.isFocused()) { return; }
+          if (e.clientX > 25 + target.getBoundingClientRect().left) { return; }
+
+          var breakpoints = e.editor.session.getBreakpoints(row, 0);
+          var row = e.getDocumentPosition().row;
+          if (typeof breakpoints[row] === typeof undefined)
+            e.editor.session.setBreakpoint(row);
+          else
+            e.editor.session.clearBreakpoint(row);
+          e.stop();
+        })
+
+        // returns an array of line numbers that have breakpoints
+        function getBreakpointLines() {
+          const breakpoints = editor.session.getBreakpoints();
+          const breakpointLines = [];
+          for (let line in breakpoints) {
+            if (breakpoints[line]) {
+              breakpointLines.push(parseInt(line));
+            }
+          }
+          return breakpointLines;
+        }
+
+        function saveAssembly() {
+          const content = editor.getValue();
+          const breakpoints = getBreakpointLines();
+          const saveData = {
+            content: content,
+            breakpoints: breakpoints
+          };
+          // create a blob and trigger download
+          const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          // create a link and click it
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'assembly.json';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+
+        function loadAssembly() {
+          // create file input element
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.json';
+          input.onchange = e => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = readerEvent => {
+              try {
+                const content = readerEvent.target.result;
+                const saveData = JSON.parse(content);
+                // set editor content
+                editor.setValue(saveData.content, -1); // -1 moves cursor to start
+                // clear existing breakpoints
+                const existingBreakpoints = editor.session.getBreakpoints();
+                for (let line in existingBreakpoints) {
+                  editor.session.clearBreakpoint(line);
+                }
+                // set saved breakpoints
+                saveData.breakpoints.forEach(line => {
+                  editor.session.setBreakpoint(line);
+                });
+              } catch (error) {
+                console.error('Error loading file:', error);
+                alert('Error loading file. Please make sure it\'s a valid assembly save file.');
+              }
+            };
+            reader.readAsText(file);
+          };
+          input.click();
+        }
+
+        async function flashAssembly() {
+          const assembly = editor.getValue()
+          const binary = await assemble(assembly)
+          loadProgramROM(binary)
+          
+          emulator.Breakpoints = []
+          const breakPoints = getBreakpointLines()
+          if (breakPoints.length === 0) { return }
+
+          const lines = assembly.split('\n')
+          machineToBreakpointMap = {}
+          let target = null
+          let machineBreakPoints = []
+          let machineLine = 0
+
+          for (let i = 0; i < lines.length; i++) {
+            if ((breakPoints.length === 0) && target === null) { break }
+            if (i === breakPoints[0]) { target = breakPoints.shift() }
+            // skip empty lines, comments, and tags
+            const trimmed = lines[i].trim()
+            if (trimmed.length === 0 || trimmed.startsWith(';')) { continue }
+            const firstToken = trimmed.split(/\s+/)[0];
+            if (firstToken.endsWith(':')) { continue }
+            // if we have a target, push the machine line number and reset target
+            if (target !== null) {
+              machineBreakPoints.push(machineLine)
+              machineToBreakpointMap[machineLine] = target
+              target = null
+            }
+            machineLine++
+          }
+
+          emulator.Breakpoints = machineBreakPoints
+        }
+      </script>
+    </div>
+
+    <!-- panel two -->
+    <div class="w-[600px] max-h-[1200px] 2xl:grow bg-base-200 rounded p-4 flex flex-col space-y-4">
+      <h3 class="font-bold text-lg">Controls</h3>
+      <div class="flex flex-row space-x-2">
+        <button class="btn btn-sm btn-primary" onclick="emulator.Start()">Start</button>
+        <button class="btn btn-sm btn-primary" onclick="emulator.Stop()">Stop</button>
+        <button class="btn btn-sm btn-primary" onclick="emulator.Step()">Step</button>
+        <button class="btn btn-sm btn-primary" onclick="emulator.Reset()">Reset</button>
+        <!-- pc -->
+        <div class="font-semibold text-center flex items-center justify-center">PC:</div>
+        <div id="pc" class="font-semibold text-center flex items-center justify-center">0</div>
+        <input id="pc_jump_address" type="number" max="255" min="0" value="0"
+          class="input input-bordered max-h-8 max-w-16" />
+        <button class="btn btn-sm btn-primary" onclick="jump()">Jump</button>
+        <div class="font-semibold text-center flex items-center justify-center">C/B Flag:</div>
+        <div id="carry" class="font-semibold text-center flex items-center justify-center">0</div>
+        <script>
+          const pc = document.getElementById('pc')
+          function jump() {
+            const address = document.getElementById('pc_jump_address').value
+            emulator.ProgramCounter = BigInt(address)
+            pc.textContent = address
+            highlightInstruction(address)
+          }
+        </script>
+      </div>
+      <div class="flex flex-row space-x-2">
+        <div class="w-2/5 font-semibold text-center flex items-center justify-center">Max Emulation Update:</div>
+        <div class="grow">
+          <input id="max_emulator_update" type="range" min="0" max="1000" value="750"
+            class="range range-xs range-primary" step="250" />
+          <div class="flex w-full justify-between px-2 text-xs">
+            <span>1Hz</span>
+            <span>|</span>
+            <span>|</span>
+            <span>|</span>
+            <span>1kHz</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex flex-row space-x-2">
+        <div class="w-2/5 font-semibold text-center flex items-center justify-center">Max UI Update:</div>
+        <div class="grow">
+          <input id="max_ui_update" type="range" min="0" max="1000" value="750" class="range range-xs range-primary"
+            step="250" />
+          <div class="flex w-full justify-between px-2 text-xs">
+            <span>1Hz</span>
+            <span>|</span>
+            <span>|</span>
+            <span>|</span>
+            <span>1kHz</span>
+          </div>
+        </div>
+      </div>
+      <script>
+        const maxEmulatorUpdate = document.getElementById('max_emulator_update')
+        const maxUiUpdate = document.getElementById('max_ui_update')
+        maxEmulatorUpdate.addEventListener('input', () => {
+          let maxEm = Number(maxEmulatorUpdate.value)
+          emulator.StepRateLimit = 1001 - maxEm
+          if (Number(maxUiUpdate.value) > maxEm) {
+            maxUiUpdate.value = maxEmulatorUpdate.value
+            emulator.UiUpdateLimit = 1001 - maxEm
+          }
+        })
+        maxUiUpdate.addEventListener('input', () => {
+          let maxUi = Number(maxUiUpdate.value)
+          emulator.UiUpdateLimit = 1001 - maxUi
+          if (maxUi > Number(maxEmulatorUpdate.value)) {
+            maxEmulatorUpdate.value = maxUiUpdate.value
+            emulator.StepRateLimit = 1001 - maxUi
+          }
+        })
+      </script>
+      <h3 class="font-bold text-lg">Program ROM</h3>
+      <div id="program" class="flex flex-col h-full overflow-y-scroll space-y-1"></div>
+      <div class="hidden p-0 m-0"></div>
+      <script>
+        /* Example:
+        <div class="flex flex-row w-full h-8 bg-base-100 rounded items-center justify-around" data-address=0>
+          <span class="text-center flex items-center justify-center font-bold">address number here e.g "000:"</div>
+          <span class="text-center flex items-center justify-center" data-bitIndex=0>0</div>
+          <span class="text-center flex items-center justify-center" data-bitIndex=1>0</div>
+          <span class="text-center flex items-center justify-center" data-bitIndex=2>0</div>
+          <span class="text-center flex items-center justify-center" data-bitIndex=3>0</div>
+          <span class="text-center flex items-center justify-center">-</div>
+          repeat the above content 3 more times, minus the address span and the div on the last one...
+        </div>
+        */
+        function genPromInstruction(address) {
+          const cell = document.createElement('div')
+          cell.classList.add('flex', 'flex-row', 'w-full', 'h-8', 'bg-base-100', 'rounded', 'items-center', 'justify-around')
+          cell.dataset.address = address
+          const addressSpan = document.createElement('span')
+          addressSpan.classList.add('text-center', 'flex', 'items-center', 'justify-center', 'font-bold')
+          addressSpan.textContent = `${address.toString(10).padStart(3, '0')}:`
+          cell.appendChild(addressSpan)
+          for (let i = 0; i < 16; i++) {
+            const bitSpan = document.createElement('span')
+            bitSpan.classList.add('text-center', 'flex', 'items-center', 'justify-center')
+            bitSpan.dataset.bitIndex = i
+            bitSpan.textContent = '0'
+            cell.appendChild(bitSpan)
+            if (i % 4 === 3 && i !== 15) {
+              const divider = document.createElement('span')
+              divider.classList.add('text-center', 'flex', 'items-center', 'justify-center')
+              divider.textContent = '-'
+              cell.appendChild(divider)
+            }
+          }
+          return cell
+        }
+
+        const program = document.getElementById('program')
+        for (let i = 0; i < 256; i++) {
+          program.appendChild(genPromInstruction(i))
+        }
+
+        // set to -1 to clear all highlights
+        function highlightInstruction(address) {
+          const cells = program.children
+          for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i]
+            if (parseInt(cell.dataset.address) === Number(address)) {
+              cell.classList.add('bg-base-300')
+              // cell.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            } else {
+              cell.classList.remove('bg-base-300')
+              cell.classList.add('bg-base-100')
+            }
+          }
+        }
+
+        // instructions is a 256 length array of BigInts
+        function loadProgramROM(instructions) {
+          // update ui
+          const cells = program.children
+          for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i]
+            const instruction = i < instructions.length ? instructions[i] : 0n
+            for (let j = 0; j < 16; j++) {
+              const bitSpan = cell.querySelector(`span[data-bit-index="${15 - j}"]`)
+              bitSpan.textContent = instruction & (1n << BigInt(j)) ? '1' : '0'
+            }
+          }
+          // update emulator
+          emulator.ProgramRom = instructions
+        }
+
+        highlightInstruction(0)
+      </script>
+    </div>
+
+    <!-- panel three -->
+    <div class="w-[600px] max-h-[1200px] 2xl:grow bg-base-200 rounded p-4 space-y-4">
+      <h3 class="font-bold text-lg">I/O registers</h3>
+      <div class="flex flex-row space-x-2">
+        <div class="font-semibold text-center flex items-center justify-center">Address:</div>
+        <input id="io_in_address" type="number" max="255" min="0" value="0"
+          class="input input-bordered max-h-8 max-w-16" />
+        <div class="font-semibold text-center flex items-center justify-center">Value:</div>
+        <input id="io_in_value" type="number" max="255" min="0" value="0"
+          class="input input-bordered max-h-8 max-w-16" />
+        <button class="btn btn-sm btn-primary" onclick="setIoReg()">Set</button>
+        <!-- add reset io btn -->
+      </div>
+      <div id="ioregs" class="grid grid-cols-16 gap-1"></div>
+      <script>
+        /* Example:
+        <div class="tooltip w-8 h-16 bg-base-100 flex flex-col rounded" data-tip="0x00" data-address=0>
+          <div class="inreg basis-1/2 text-center flex items-center justify-center">value</div>
+          <div class="outreg basis-1/2 text-center flex items-center justify-center">value</div>
+        </div>
+        */
+        function genIoCell(address) {
+          const cell = document.createElement('div')
+          cell.classList.add('tooltip', 'w-8', 'h-16', 'bg-base-100', 'flex', 'flex-col', 'rounded')
+          cell.dataset.tip = `0x${address.toString(16).padStart(2, '0')}`
+          cell.dataset.address = address
+          const inreg = document.createElement('div')
+          inreg.classList.add('inreg', 'basis-1/2', 'text-center', 'flex', 'items-center', 'justify-center')
+          inreg.textContent = '0'
+          const outreg = document.createElement('div')
+          outreg.classList.add('outreg', 'basis-1/2', 'text-center', 'flex', 'items-center', 'justify-center')
+          outreg.textContent = '0'
+          cell.appendChild(inreg)
+          cell.appendChild(outreg)
+          return cell
+        }
+
+        const ioregs = document.getElementById('ioregs')
+        for (let i = 0; i < 16; i++) {
+          ioregs.appendChild(genIoCell(i))
+        }
+
+        function setIoReg() {
+          const address = document.getElementById('io_in_address').value
+          const value = document.getElementById('io_in_value').value
+          emulator.InRegisters[address] = BigInt(value)
+          const cell = ioregs.children[address]
+          cell.children[0].textContent = value
+        }
+      </script>
+      <h3 class="font-bold text-lg">Register file</h3>
+      <div id="regfile" class="grid grid-cols-16 gap-1"></div>
+      <h3 class="font-bold text-lg">Memory</h3>
+      <div id="memory" class="grid grid-cols-16 gap-1"></div>
+      <script>
+        // Example: <div class="tooltip w-8 h-8 bg-base-100 text-center flex items-center justify-center rounded" data-tip="0x00" data-address=0>value</div>
+        function genCell(address) {
+          const cell = document.createElement('div')
+          cell.classList.add('tooltip', 'w-8', 'h-8', 'bg-base-100', 'text-center', 'flex', 'items-center', 'justify-center', 'rounded')
+          cell.dataset.tip = `0x${address.toString(16).padStart(2, '0')}`
+          cell.dataset.address = address
+          cell.textContent = address.toString(10).padStart(3, '0')
+          return cell
+        }
+
+        // generate regfile
+        const regfile = document.getElementById('regfile')
+        for (let i = 0; i < 16; i++) {
+          regfile.appendChild(genCell(i))
+        }
+        // switch 0 reg bg to base-300 to indicate it's a constant 0
+        regfile.children[0].classList.remove('bg-base-100')
+        regfile.children[0].classList.add('bg-base-300')
+
+        // generate memory
+        const memory = document.getElementById('memory')
+        for (let i = 0; i < 256; i++) {
+          memory.appendChild(genCell(i))
+        }
+
+        emulator.Init()
+      </script>
+    </div>
+
+  </div>
+
+</body>
+
+</html>

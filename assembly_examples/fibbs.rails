@@ -1,11 +1,19 @@
-// simple fibbs program
+; Simple Fibonacci example where you can set
+; the number of iterations via input register 0
 
-      IMM r1 1        # store 1 in reg 1.
-      IMM r3 1        # store 1 in reg 3.
-      IN  r15 r0      # get n from io reg 0.
-frog: ADD r2 r1 r2    # start of loop, add regs 1 and 2, store result in reg 2.
-      ADD r1 r1 r2    # add regs 1 and 2, store result in reg 1.
-      ADD r4 r3 r4    # increment loop counter, add regs 3 and 4, store in 4.
-      BEQ done: r4    # branch to line with tag "done" if reg 15 and reg 4 are equal.
-      JMP frog:       # jump to line with tag "frog".
-done: EXIT
+  imm r1, 1         ; store 1 in reg 1
+  imm r3, 1         ; store 1 in reg 3
+  in  r15, r0       ; get n from input reg 0
+frog:
+  add r2, r1, r2    ; add regs 1 and 2, store in reg 2
+  add r1, r1, r2    ; add regs 1 and 2, store in reg 1
+  add r4, r3, r4    ; increment counter, add regs 3 and 4
+  beq done, r4      ; branch to "done" if r15 == r4
+  jmp frog          ; jump to "frog"
+done:
+  exit
+
+; Code executes top-down, ignoring empty lines,
+; comments, and label lines (e.g., frog:).
+; Labels make jumps/branches easier without
+; needing specific machine code addresses.

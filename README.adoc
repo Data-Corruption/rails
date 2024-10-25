@@ -11,20 +11,21 @@
 Rails is an https://en.wikipedia.org/wiki/Instruction_set_architecture[ISA]
  I designed for minimal implementation complexity while still being practically
  capable of general computation and being 3 operand. There are 16 instructions
- plus 3 pseudo instructions. Each instruction is 16 bits and there are 2 
+ plus 4 pseudo instructions. Each instruction is 16 bits and there are 2 
 encoding formats. The instruction set was heavily inspired by 
 https://user.eng.umd.edu/~blj/RiSC/[RiSC 16], developed and used by Bruce Jacob 
 at University of Maryland. RiSC 16 itself is a derivative of the Little Computer 
 (LC-896) developed by Peter Chen at the University of Michigan.
 
-<<Section1,Getting Started>> | <<Section2,ISA>> | <<Section3,Redstone Build>> | <<Section4,Building From Source>>
+<<Section1,Getting Started>> | <<Section2,ISA>>
 
 == Getting Started [[Section1]]
 
 1. Download The Emulator - Get the latest https://github.com/Data-Corruption/Rails/releases/latest[release] from this repo and unzip it.
-2. Create a Program - Write a .rails file using instructions from the ISA. See https://github.com/Data-Corruption/Rails/tree/main/assembly_examples[examples] for guidance.
-3. Run the Program - Launch the emulator, open your program, and you're ready to go!
-4. Bring it into Minecraft - wip
+2. Launch The Emulator - Run the exe, then click the link it provides to open it in your browser.
+3. Create a Program - Using the emulator, write a program. See https://github.com/Data-Corruption/Rails/tree/main/assembly_examples[examples] for guidance.
+
+image::emulator.png[Emulator Screenshot]
 
 == ISA [[Section2]]
 
@@ -69,7 +70,7 @@ at University of Maryland. RiSC 16 itself is a derivative of the Little Computer
 |NOP      |This operation does nothing and is replaced by ADD r0, r0, r0
 |MOV rX rY|This copies data from rX to rY. It is replaced by ADD rX, r0, rY
 |JMP IMM  |This jumps to IMM. It is replaced by BEQ IMM r15. The IMM like the rest, can be a line tag.
-|EXIT     |This stops the cpu and resets the program counter. It is replaced + by JMPL r0, r0.
+|EXIT     |This stops the cpu from running. It is replaced + by JMPL r0, r0.
 |====
 .Memory
 [cols="~,80"]
@@ -83,41 +84,6 @@ at University of Maryland. RiSC 16 itself is a derivative of the Little Computer
 |Instruction Storage |Since the Program Counter is 8 bit (256 addresses) and instructions are 16 bit (2 bytes each), this means the instruction memory will be 512 bytes of ROM.
 |====
 
-== Redstone Build [[Section3]]
-
-wip
-
-== Building From Source [[Section4]]
-
-The library https://github.com/AllenDang/giu[giu] depends on OpenGL 3.3, make sure your environment supports it.
-
-=== Windows
-
-Install https://jmeubank.github.io/tdm-gcc/[TDM-GCC]
-
-or
-
-* Install https://github.com/brechtsanders/winlibs_mingw/releases/latest[mingw]
-* Add the binaries folder of mingw to the path (usually is \mingw64\bin).
-* go get github.com/AllenDang/giu
-
-Then you should be able to build by running build.bat from the root folder of the project.
-
-=== Linux
-
-Install the required dependencies:
-[source,shell]
-----
-sudo apt install libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libglx-dev libgl1-mesa-dev libxxf86vm-dev libgtk-3-dev
-----
-on Red Hat based distributions:
-[source,shell]
-----
-sudo dnf install libX11-devel libXcursor-devel libXrandr-devel libXinerama-devel libXi-devel libGL-devel libXxf86vm-devel gtk3-devel
-----
-
-you may also need to install C/C++ compiler (like g++) if it isn't already installed. Follow go compiler prompts.
-
-Then you should be able to build by running build.sh from the root folder of the project.
-
-Cross-compiling is a bit more complicated, see the https://pkg.go.dev/github.com/AllenDang/giu#readme-install[giu docs]
+.Future Roadmap:
+* System Verilog implementation.
+* Maybe more info in breakpoint toasts (e.g., src line number).
