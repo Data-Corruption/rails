@@ -22,7 +22,7 @@ at University of Maryland. RiSC 16 itself is a derivative of the Little Computer
 == Getting Started [[Section1]]
 
 1. Download The Emulator - Get the latest https://github.com/Data-Corruption/Rails/releases/latest[release] from this repo and unzip it.
-2. Launch The Emulator - Run the exe, then click the link it provides to open it in your browser.
+2. Launch The Emulator - Run the exe/bin, then click the link it provides to open it in your browser.
 3. Create a Program - Using the emulator, write a program. See https://github.com/Data-Corruption/Rails/tree/main/assembly_examples[examples] for guidance.
 
 image::emulator.png[Emulator Screenshot]
