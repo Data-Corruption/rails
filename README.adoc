@@ -83,3 +83,7 @@ image::emulator.png[Emulator Screenshot]
 |Data Storage |Data storage is 256 bytes of RAM.
 |Instruction Storage |Since the Program Counter is 8 bit (256 addresses) and instructions are 16 bit (2 bytes each), this means the instruction memory will be 512 bytes of ROM.
 |====
+
+.Future Roadmap:
+* System Verilog implementation.
+* Maybe more info in breakpoint toasts (e.g., src line number).
